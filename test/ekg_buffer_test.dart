@@ -30,4 +30,14 @@ void main() {
     buffer.clear();
     expect(buffer.length, 0);
   });
+
+  test('index outside the stored samples is an error (debug mode)', () {
+    final buffer = EkgBuffer(5);
+    buffer.add(1);
+    buffer.add(2);
+
+    expect(buffer[1], 2);
+    expect(() => buffer[2], throwsA(isA<AssertionError>()));    // only 2 samples stored
+    expect(() => buffer[-1], throwsA(isA<AssertionError>()));
+  });
 }
