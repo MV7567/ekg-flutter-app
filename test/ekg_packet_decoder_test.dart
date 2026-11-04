@@ -87,6 +87,17 @@ void main() {
     expect(decoder.sampleCount, 0);
   });
 
+  test('rejected packet is also counted as lost, the time axis stays correct', () {
+    final decoder = EkgPacketDecoder();
+    decoder.decode(makePacket(0, tenTimes(0)));
+    decoder.decode(makePacket(1, tenTimes(0)).sublist(0, 20));   // packet 1 cut, rejected
+    final next = decoder.decode(makePacket(2, tenTimes(0)))!;
+
+    expect(decoder.badPackets, 1);
+    expect(decoder.lostPackets, 1);       // packet 1 is missing in the data
+    expect(next.firstSampleIndex, 20);    // its 10 samples are skipped, not shifted
+  });
+
   test('reset starts a new recording from zero', () {
     final decoder = EkgPacketDecoder();
     decoder.decode(makePacket(0, tenTimes(0)));

@@ -84,9 +84,14 @@ class CsvRecorder {
 
   // one line: sample number, time, raw value, value in mV
   void writeSample(int sampleIndex, int rawValue) {
+    _sink?.writeln(csvLine(sampleIndex, rawValue));
+  }
+
+  // the text of one line (without the new line), static so it can be tested without a file
+  static String csvLine(int sampleIndex, int rawValue) {
     double timeS = sampleIndex / sampleRateHz;
     double millivolts = rawValue * millivoltsPerLsb;
-    _sink?.writeln("$sampleIndex,${timeS.toStringAsFixed(3)},$rawValue,${millivolts.toStringAsFixed(4)}");
+    return "$sampleIndex,${timeS.toStringAsFixed(3)},$rawValue,${millivolts.toStringAsFixed(4)}";
   }
   // one csv line
   // / division by sampleRateHz gives the time in seconds, to 3 decimal places is enough for 1 kHz

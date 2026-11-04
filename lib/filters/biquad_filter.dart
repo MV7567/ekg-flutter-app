@@ -1,39 +1,40 @@
-import 'dart:math';
+import 'dart:math';   // pi, sin, cos....
 
 // "biquad" IIR filter: every output sample is calculated from
 // the current input, the 2 previous inputs and the 2 previous outputs:
 //   y = b0*x + b1*x1 + b2*x2 - a1*y1 - a2*y2
 // only the 5 coefficients decide what the filter does (notch, low-pass, ...)
 // formulas from the "Audio EQ Cookbook" (R. Bristow-Johnson)
+
+// x is the current input sample (raw mV)
+// x1 and x2 are the 2 previous input samples
+// y1, y2 are the 2 previous output samples (what the filter calculated before)
+// since it uses its own previous outputs its an IIR filter (infinite impulse response) 
+// Biquad means it has 2 previous values on each side 
+
 class BiquadFilter {
   BiquadFilter._(this._b0, this._b1, this._b2, this._a1, this._a2);
 
   // notch (band-stop): removes one frequency, lets the rest through
   // q: bigger = narrower notch, 5 -> about 10 Hz wide around 50 Hz
-  factory BiquadFilter.notch({
+  factory BiquadFilter.notch({    // kind of contructor, firs tit calculates then it calls BiquadFilter._(...), and returns a ready object
     required double frequencyHz,
     required double sampleRateHz,
     double q = 5,
   }) {
-    double w0 = 2 * pi * frequencyHz / sampleRateHz;   // frequency as an angle per sample
-    double alpha = sin(w0) / (2 * q);
-    double cosW0 = cos(w0);
-    double a0 = 1 + alpha;
+    var (cosW0, alpha, a0) = _common(frequencyHz, sampleRateHz, q);
     // everything is divided by a0, so the formula in process() is simpler
     return BiquadFilter._(1 / a0, -2 * cosW0 / a0, 1 / a0, -2 * cosW0 / a0, (1 - alpha) / a0);
   }
 
   // low-pass: lets slow changes through, removes everything above frequencyHz
-  // q = 0.7071 -> "Butterworth", flat until the cut-off frequency, no overshoot
+  // q = 0.7071 -> "Butterworth", flat until the cut-off frequency, no peak in the frequency response 
   factory BiquadFilter.lowPass({
     required double frequencyHz,
     required double sampleRateHz,
     double q = 0.7071,
   }) {
-    double w0 = 2 * pi * frequencyHz / sampleRateHz;
-    double alpha = sin(w0) / (2 * q);
-    double cosW0 = cos(w0);
-    double a0 = 1 + alpha;
+    var (cosW0, alpha, a0) = _common(frequencyHz, sampleRateHz, q);
     return BiquadFilter._((1 - cosW0) / 2 / a0, (1 - cosW0) / a0, (1 - cosW0) / 2 / a0,
         -2 * cosW0 / a0, (1 - alpha) / a0);
   }
@@ -45,12 +46,23 @@ class BiquadFilter {
     required double sampleRateHz,
     double q = 0.7071,
   }) {
-    double w0 = 2 * pi * frequencyHz / sampleRateHz;
-    double alpha = sin(w0) / (2 * q);
-    double cosW0 = cos(w0);
-    double a0 = 1 + alpha;
+    var (cosW0, alpha, a0) = _common(frequencyHz, sampleRateHz, q);
     return BiquadFilter._((1 + cosW0) / 2 / a0, -(1 + cosW0) / a0, (1 + cosW0) / 2 / a0,
         -2 * cosW0 / a0, (1 - alpha) / a0);
+  }
+
+  // the part that is the same for every filter type, returns 3 values at once (a "record"), since dart function can turn one thing, record makes it so that one thing is actually 3 things
+  static (double cosW0, double alpha, double a0) _common(
+      double frequencyHz, double sampleRateHz, double q) {
+    // a digital filter only works between 0 and half the sample rate (Nyquist, 125 Hz at 250 SPS):
+    // exactly at fs/2 the filter starts to oscillate by itself, above it the wrong frequency is filtered
+    assert(frequencyHz > 0 && frequencyHz < sampleRateHz / 2,
+        'filter frequency $frequencyHz Hz must be between 0 and ${sampleRateHz / 2} Hz');   // debug only, check the frequency, all in one spot
+    double w0 = 2 * pi * frequencyHz / sampleRateHz;   // frequency as an angle per sample
+    double alpha = sin(w0) / (2 * q);                  // width of the filter, bigger q gives smaller alpha and narrower notch
+    double cosW0 = cos(w0);
+    double a0 = 1 + alpha;
+    return (cosW0, alpha, a0);
   }
 
   // filter coefficients, calculated once
@@ -84,7 +96,7 @@ class BiquadFilter {
   }
 }
 
-// the filters used for the EKG chart, one after another:
+// the filters used for the EKG chart, one after another: Connects 4 biquad filters for the chart
 //  1. high-pass 0.5 Hz - removes the offset (~ -9 mV) and the slow drift of the line (breathing, movement)
 //  2. notch 50 Hz  - mains hum
 //  3. notch 100 Hz - 2nd harmonic of the mains hum (the hum is not a clean sine)
@@ -93,10 +105,15 @@ class EkgDisplayFilter {
   EkgDisplayFilter(double sampleRateHz)
       : _highPass = BiquadFilter.highPass(frequencyHz: 0.5, sampleRateHz: sampleRateHz),
         _notch50 = BiquadFilter.notch(frequencyHz: 50, sampleRateHz: sampleRateHz),
-        _notch100 = BiquadFilter.notch(frequencyHz: 100, sampleRateHz: sampleRateHz),
+        // 100 Hz can only be filtered below the Nyquist frequency (needs more than 200 SPS),
+        // otherwise null = no 100 Hz notch (at lower rates the low-pass already removes it)
+        _notch100 = 100 < sampleRateHz / 2
+            ? BiquadFilter.notch(frequencyHz: 100, sampleRateHz: sampleRateHz)
+            : null,
         _lowPass = BiquadFilter.lowPass(frequencyHz: 40, sampleRateHz: sampleRateHz);
 
-  final BiquadFilter _highPass, _notch50, _notch100, _lowPass;
+  final BiquadFilter _highPass, _notch50, _lowPass;
+  final BiquadFilter? _notch100;
 
   // false until the first sample arrives
   bool _primed = false;
@@ -109,13 +126,15 @@ class EkgDisplayFilter {
       _highPass.prime(x, 0);
       _primed = true;
     }
-    return _lowPass.process(_notch100.process(_notch50.process(_highPass.process(x))));
+    double y = _notch50.process(_highPass.process(x));
+    if (_notch100 != null) y = _notch100.process(y);
+    return _lowPass.process(y);
   }
 
   void reset() {
     _highPass.reset();
     _notch50.reset();
-    _notch100.reset();
+    _notch100?.reset();
     _lowPass.reset();
     _primed = false;
   }

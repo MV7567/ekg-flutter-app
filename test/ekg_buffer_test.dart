@@ -31,6 +31,16 @@ void main() {
     expect(buffer.length, 0);
   });
 
+  test('addAll tells the listeners once per packet, not once per sample', () {
+    final buffer = EkgBuffer(20);
+    int calls = 0;
+    buffer.addListener(() => calls++);   // the chart does the same through repaint: buffer
+
+    buffer.addAll(List.filled(10, 0.0));   // one BLE packet
+    expect(calls, 1);
+    expect(buffer.length, 10);
+  });
+
   test('index outside the stored samples is an error (debug mode)', () {
     final buffer = EkgBuffer(5);
     buffer.add(1);

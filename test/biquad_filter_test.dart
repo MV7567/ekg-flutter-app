@@ -6,11 +6,13 @@ const fs = 250.0;
 
 // sends a sine wave (amplitude 1) through the filter and returns the biggest output value
 // after the filter has settled (the first 2 seconds are skipped)
-double outputAmplitude(double Function(double) filter, double frequencyHz) {
+// sampleRate is optional, by default the 250 SPS of the ADS1194
+double outputAmplitude(double Function(double) filter, double frequencyHz,
+    {double sampleRate = fs}) {
   double maxOut = 0;
-  for (int i = 0; i < fs * 4; i++) {
-    double y = filter(sin(2 * pi * frequencyHz * i / fs));
-    if (i > fs * 2) maxOut = max(maxOut, y.abs());
+  for (int i = 0; i < sampleRate * 4; i++) {
+    double y = filter(sin(2 * pi * frequencyHz * i / sampleRate));
+    if (i > sampleRate * 2) maxOut = max(maxOut, y.abs());
   }
   return maxOut;
 }
@@ -53,5 +55,20 @@ void main() {
       maxOut = max(maxOut, y.abs());
     }
     expect(maxOut, lessThan(0.5));   // without priming the start would jump by several mV
+  });
+
+  test('frequency at or above half the sample rate is an error (debug mode)', () {
+    expect(() => BiquadFilter.notch(frequencyHz: 125, sampleRateHz: fs),
+        throwsA(isA<AssertionError>()));   // exactly Nyquist
+    expect(() => BiquadFilter.lowPass(frequencyHz: 0, sampleRateHz: fs),
+        throwsA(isA<AssertionError>()));
+  });
+
+  test('EKG display filter works at 125 SPS (no 100 Hz notch then)', () {
+    const slowFs = 125.0;
+    expect(outputAmplitude(EkgDisplayFilter(slowFs).process, 49.9, sampleRate: slowFs),
+        lessThan(0.05));      // hum still removed
+    expect(outputAmplitude(EkgDisplayFilter(slowFs).process, 1, sampleRate: slowFs),
+        greaterThan(0.95));   // EKG kept, filter does not oscillate
   });
 }
