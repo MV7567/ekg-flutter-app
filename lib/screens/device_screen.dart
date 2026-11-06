@@ -4,15 +4,21 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';  // UUID, packetLengh
 import '../ekg_config.dart';                                // bytes -> samples
 import '../ekg_buffer.dart';                                // saving to CSV
 import '../ekg_packet_decoder.dart';                        // chart filters
+import '../ekg_test_signal.dart';                           // fake ESP32 (debug)
 import '../recording/csv_recorder.dart';                    // drawing the chart
 import '../filters/biquad_filter.dart';                     
 import '../widgets/ekg_chart.dart';
 
 // device screen, stateful widget, because we need to update the UI when connecting and recording
 class DeviceScreen extends StatefulWidget {
-  final BluetoothDevice device;
+  final BluetoothDevice? device;   // null = test signal instead of the ESP32
+  // in BLE functions (connect, discoverServices...) there is widget.device! because in test mode the functions are never called 
+  // where the device cant be, there is ?.: mtuNow and disconnect() in dispose
 
-  const DeviceScreen({super.key, required this.device});
+  const DeviceScreen({super.key, required BluetoothDevice this.device});
+
+  // debug only: the app makes the signal itself (EkgTestSignal), no BLE, no board needed
+  const DeviceScreen.testSignal({super.key}) : device = null; // a regulat constructor requires a real device so during connect you cant accidentaly get null
   // the same scheme as the scanner, the main difference: widget gets the parameter device, meaning the device clicked in the scanner  (DeviceScreen(device: result.device)).
   // - required means, without this parameter the code wont compile
   // this.device assigns the parameter to the field immediately
@@ -68,10 +74,20 @@ class _DeviceScreenState extends State<DeviceScreen> {
   double _mvPerBigSquare = 0.25;
   // scale form the switch x1/x2/x4
 
+  // test signal mode: the generator calls _processEkgData like the BLE notifications do
+  bool get _isTestSignal => widget.device == null;
+  late final EkgTestSignal? _testSignal = _isTestSignal ? EkgTestSignal(_processEkgData) : null;
+  // late is needed because the initializator uses widget and _processEkgData and those are avaible after creating State object
+
   @override
   void initState() {
     super.initState();
-    _connectToDevice();
+    if (_isTestSignal) {
+      // nothing to connect to, the screen is ready at once
+      _connectionState = BluetoothConnectionState.connected;
+    } else {
+      _connectToDevice();
+    }
   }
   // the screen begins to connect immediately after opening. Like in the scanner, without await, because initState cant be async
 
@@ -86,7 +102,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
     // the second one can start before the first one finished its await.
     // it is safe here, because _discoverAndSubscribe cancels the old subscription first
     // and _finishRecording can be called twice
-    _connectionSubscription ??= widget.device.connectionState.listen((state) async {
+    _connectionSubscription ??= widget.device!.connectionState.listen((state) async {
       // ??== means write only when the variable is null. the function is called also from the RECONNECT button, and thanks to ??== a subscription i created only the first time
       // Without it every next connection would add another listener and the "connection lost" would appear 2, 3, 4 etc times
       // connectionState is this devices change state stream
@@ -121,7 +137,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
     // needed because one packet is 21 bytes and the default MTU only allows 20)
     setState(() => _isConnecting = true);
     try {
-      await widget.device.connect();
+      await widget.device!.connect();
     } catch (e) {
       // e.g. the ESP32 is off or too far away, connect() gives up after 35 s
       debugPrint("Connection error: $e");
@@ -144,7 +160,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
       // ?. means cal if not null. if there is a remaining subscription from a previous connection, we turn it off.
       // otherwise after RECONNECT every packet would be saved twice
 
-      List<BluetoothService> services = await widget.device.discoverServices();
+      List<BluetoothService> services = await widget.device!.discoverServices();
       bool foundDataCharacteristic = false;
       // we aks the esp32 for a list of every service and characteristic, exchanging a couple messages lasts a split second
 
@@ -167,7 +183,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
             // onValueReceived only gives new notifications. lastValueStream would immediately would repeat the last remembered value, which would double the first packet
 
             // the plugin cancels the subscription by itself when the device disconnects
-            widget.device.cancelWhenDisconnected(_bleSubscription!);
+            widget.device!.cancelWhenDisconnected(_bleSubscription!);
             // The plugin will turn off the subscription on its own when disconnected. ! means we know its not null. we're sure because it was assigned in the prievious line 
             // but if it actually was null it would throw an error so only use ! when sure the value exists
 
@@ -195,7 +211,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
     } catch (e) {
       debugPrint("Service discovery error: $e");
       // the same as above: no spinner forever, the user can try again
-      if (widget.device.isConnected) {
+      if (widget.device!.isConnected) {
         await _disconnectWithMessage('Could not read the EKG service, try to reconnect');
       }
     }
@@ -206,7 +222,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
   Future<void> _disconnectWithMessage(String message) async {
     _showMessage(message);
     try {
-      await widget.device.disconnect();
+      await widget.device!.disconnect();
     } catch (e) {
       debugPrint("Disconnect error: $e");
     }
@@ -215,7 +231,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
   // ---------------- start / stop ----------------
 
   Future<void> _startRecording() async {
-    if (_controlCharacteristic == null) return;
+    if (_controlCharacteristic == null && !_isTestSignal) return;
     setState(() => _isBusy = true);
     // without the control characteristic there is no way to send START, so the function finishes immediately. 
     // in practise the button is hidden anyway in that moment, its just a safety thing. Later _isBusy = true turns off the button for the start time
@@ -223,7 +239,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
     // setState(() => _isBusy = true) is short for setState(() { _isBusy = true; })
 
     // a new file for every measurement
-    bool fileReady = await _recorder.open(deviceName: widget.device.platformName);
+    // "TEST_SIGNAL" in the CSV header, so test files are easy to tell apart in Recordings
+    bool fileReady = await _recorder.open(deviceName: widget.device?.platformName ?? 'TEST_SIGNAL');
     if (!fileReady) {
       _showMessage('Could not create the data file');
       if (mounted) setState(() => _isBusy = false);   // the user could have left the screen during await
@@ -243,7 +260,11 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
     try {
       // tell the ESP32 to start the ADC and send data
-      await _controlCharacteristic!.write([controlStart]);
+      if (_testSignal != null) {
+        _testSignal.start();   // test mode: the generator sends the packets instead
+      } else {
+        await _controlCharacteristic!.write([controlStart]);
+      }
       // saving one byte 0x01 to the control characteristic.
       // [controlStart] is a list with one element, because write always accepts a byte list. 
       // on the esp32 ControlCallbacks::onWrite is called, which sets startRequested = true
@@ -274,6 +295,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
   Future<void> _stopRecording() async {
     setState(() => _isBusy = true);
+    _testSignal?.stop();   // test mode, null with the ESP32
     try {
       // tell the ESP32 to stop the ADC
       await _controlCharacteristic?.write([controlStop]);
@@ -318,7 +340,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
     EkgPacket? packet = _decoder.decode(data);
     if (packet == null) {
       // wrong length (usually MTU) or a duplicate, the decoder counts both
-      debugPrint("Packet skipped: length ${data.length}, MTU ${widget.device.mtuNow}, "
+      debugPrint("Packet skipped: length ${data.length}, MTU ${widget.device?.mtuNow}, "
           "duplicates ${_decoder.duplicatePackets}");
       return;
     }
@@ -403,6 +425,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
     // closing order
     // 1. Cancel the BLE subscriptions and the UI timer
     _uiTimer?.cancel();
+    _testSignal?.stop();
     _bleSubscription?.cancel();
     _connectionSubscription?.cancel();
     // 2. Close the file (leaving the screen during a recording), not awaited, dispose can't wait
@@ -410,7 +433,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
     _recorder.close();
     // 3. Disconnect the device (the ESP32 stops the measurement when the phone disconnects)
     // catchError: an error here (e.g. already disconnected) is only printed, not "Unhandled exception"
-    widget.device.disconnect().catchError((e) => debugPrint("Disconnect error: $e"));
+    widget.device?.disconnect().catchError((e) => debugPrint("Disconnect error: $e"));
     // 4. Free the chart buffer (it is a ChangeNotifier, the chart stops listening to it)
     _chartBuffer.dispose();
     super.dispose();
@@ -418,16 +441,22 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
   // ---------------- UI ----------------
 
+  String get _deviceTitle {
+    BluetoothDevice? device = widget.device;
+    if (device == null) return 'Test signal (debug)';
+    return device.platformName.isEmpty ? "Unknown" : device.platformName;
+  }
+
   @override
   Widget build(BuildContext context) {
     bool connected = _connectionState == BluetoothConnectionState.connected;
-    bool ready = connected && _controlCharacteristic != null;
+    bool ready = connected && (_controlCharacteristic != null || _isTestSignal);
     bool connecting = _isConnecting && !connected;
     // additional variables to make condition statements more readable
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.device.platformName.isEmpty ? "Unknown" : widget.device.platformName),
+        title: Text(_deviceTitle),
       ),
       // the name of the device in the bar
       // PopScope: during a recording going back first asks (see _confirmLeave)
@@ -477,7 +506,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
                   // connection state
                   Text(
-                    connecting ? 'CONNECTING...' : _connectionState.name.toUpperCase(),   // .name changes the enum value to text, and makes it uppercase
+                    _isTestSignal ? 'TEST SIGNAL' : (connecting ? 'CONNECTING...' : _connectionState.name.toUpperCase()),   // .name changes the enum value to text, and makes it uppercase
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
@@ -524,7 +553,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                     // packets of the wrong size are not saved, usually the MTU is too small
                     if (_decoder.badPackets > 0)
                       Text('Rejected packets: ${_decoder.badPackets} '
-                          '(length ${_decoder.lastBadLength} instead of $packetLength, MTU ${widget.device.mtuNow})',
+                          '(length ${_decoder.lastBadLength} instead of $packetLength, MTU ${widget.device?.mtuNow})',
                         style: const TextStyle(color: Colors.red), textAlign: TextAlign.center),
                   ],
 

@@ -121,7 +121,7 @@ class CsvRecorder {
       ok = false;
     }
     // registered also after an error, the part written so far is still in the file
-    await _registerInMediaStore(_filePath);
+    await updateMediaStore(_filePath);
     return ok;
     // flush pushes to the file whatever waits in the sink buffer
     // close closes the file, after that the sink is invalid
@@ -154,7 +154,8 @@ class CsvRecorder {
     return file;
   }
 
-  Future<void> _registerInMediaStore(String path) async {
+  // static and public: also used after deleting a file, a scan of a missing file removes its MediaStore entry
+  static Future<void> updateMediaStore(String path) async {
     if (!Platform.isAndroid || path.isEmpty) return;
     try {
       await _mediaScanner.invokeMethod('scanFile', {'path': path});

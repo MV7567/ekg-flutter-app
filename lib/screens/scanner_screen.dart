@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:io';                                             // Platform.isAndroid
 import 'package:device_info_plus/device_info_plus.dart';      // Android version
+import 'package:flutter/foundation.dart';                     // kDebugMode
 import 'package:flutter/material.dart';                       // import ui stuff
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';    // import bluetooth stuff
 import 'package:permission_handler/permission_handler.dart';  // import permission stuff
 import '../ekg_config.dart';  //higher up folder
 import 'device_screen.dart';
+import 'recordings_screen.dart';
 
 // scanner, stateful widget, because we need to update the UI when scanning
 class ScannerScreen extends StatefulWidget {
@@ -170,6 +172,27 @@ class _ScannerScreenState extends State<ScannerScreen> {
     return Scaffold(    // basic visual skeleton
       appBar: AppBar(   // top bar
         title: const Text('Search for EKG Devices'),
+        actions: [      // actions is the icon spot on the right side of AppBar.
+          // kDebugMode is a constant: false in a release build, so this button is not even compiled in
+          if (kDebugMode) // only true for flutter run, not flutter build apk --release
+            IconButton(
+              icon: const Icon(Icons.science),
+              tooltip: 'Test signal (debug)',
+              onPressed: () {
+                FlutterBluePlus.stopScan();
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const DeviceScreen.testSignal()),
+                );
+              },
+            ),
+          IconButton(
+            icon: const Icon(Icons.folder_open),
+            tooltip: 'Recordings',      // subtitle that shows up when held down
+            onPressed: () => Navigator.of(context).push(      // same navigator push as CONNECT
+              MaterialPageRoute(builder: (context) => const RecordingsScreen()),
+            ),
+          ),
+        ],
       ),
       // Scaffold is the standard layout of the Material screen
       // with spot for the upper bar, content, floating buttons and SnackBar
