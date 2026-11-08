@@ -8,6 +8,7 @@ import 'package:permission_handler/permission_handler.dart';  // import permissi
 import '../ekg_config.dart';  //higher up folder
 import 'device_screen.dart';
 import 'recordings_screen.dart';
+import 'settings_screen.dart';
 
 // scanner, stateful widget, because we need to update the UI when scanning
 class ScannerScreen extends StatefulWidget {
@@ -190,6 +191,13 @@ class _ScannerScreenState extends State<ScannerScreen> {
             tooltip: 'Recordings',      // subtitle that shows up when held down
             onPressed: () => Navigator.of(context).push(      // same navigator push as CONNECT
               MaterialPageRoute(builder: (context) => const RecordingsScreen()),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: 'Settings',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (context) => const SettingsScreen()),
             ),
           ),
         ],
