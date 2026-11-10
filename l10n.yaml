@@ -1,0 +1,10 @@
+# settings for "flutter gen-l10n" (runs by itself with flutter run / build / test)
+# the texts are in lib/l10n/app_<language>.arb, English is the template:
+# every key must be in app_en.arb, the other languages translate it
+# a new language = a new file, e.g. app_de.arb, nothing else to change
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-dir: lib/l10n
+output-localization-file: app_localizations.dart
+# AppLocalizations.of(context) never returns null, no "!" needed everywhere
+nullable-getter: false

@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';   // ValueListenable
 import 'package:flutter/material.dart';
 import '../ekg_buffer.dart';
+import '../l10n/app_localizations.dart';
 
 // widget that shows the samples from an EkgBuffer as a line on EKG paper
 // time:      1 big square = 0.2 s, 1 small square = 0.04 s (like paper at 25 mm/s)
@@ -10,17 +12,22 @@ class EkgChart extends StatelessWidget {
     required this.buffer,
     required this.sampleRateHz,
     this.mvPerBigSquare = 0.5,  // not required bc it has a default value
+    this.beatMarkers,
   });
 
 // final: cannot be changed after the constructor, required: must be given when creating the widget
   final EkgBuffer buffer;
   final int sampleRateHz;
   final double mvPerBigSquare;
+  // optional: where the R waves are, as positions in the buffer (0 = oldest sample),
+  // a small red triangle is drawn under each one; null = no markers (live chart)
+  final ValueListenable<List<int>>? beatMarkers;
 
   // text in the top left corner, e.g. "1 square: 0.2 s × 0.125 mV"
   // static and public, so it can be tested without drawing anything
-  static String scaleLabel(double secondsPerSquare, double mvPerSquare) =>
-      '1 square: ${_trimmed(secondsPerSquare)} s × ${_trimmed(mvPerSquare)} mV';
+  // t = texts in the chosen language ("1 square" / "1 kratka"), the numbers are formatted here
+  static String scaleLabel(AppLocalizations t, double secondsPerSquare, double mvPerSquare) =>
+      t.chartScale(_trimmed(secondsPerSquare), _trimmed(mvPerSquare));
 
   // 3 decimal places without the zeros at the end: 0.500 -> 0.5, 0.250 -> 0.25, 0.125 -> 0.125
   static String _trimmed(double value) {
@@ -35,8 +42,10 @@ class EkgChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // CustomPaint gives us a canvas, the drawing itself is done by _EkgPainter
+    // the painter has no context, so the translated label is made here and passed in
+    String label = scaleLabel(AppLocalizations.of(context), _EkgPainter.secondsPerBigSquare, mvPerBigSquare);
     return CustomPaint(
-      painter: _EkgPainter(buffer, sampleRateHz, mvPerBigSquare),
+      painter: _EkgPainter(buffer, sampleRateHz, mvPerBigSquare, label, beatMarkers),
       size: Size.infinite,   // take all the space the parent gives
     );
   }
@@ -48,7 +57,9 @@ class _EkgPainter extends CustomPainter {
   // the widget gives the canvas to the painter, the drawing is done by CustomPainter aka _EkgPainter. 
   // we use this because the pre made widget arent enough
   // size.infite means take up all the space from the parent
-  _EkgPainter(this.buffer, this.sampleRateHz, this.mvPerBigSquare) : super(repaint: buffer);
+  // Listenable.merge: repaint when the buffer OR the markers change
+  _EkgPainter(this.buffer, this.sampleRateHz, this.mvPerBigSquare, this.label, this.beatMarkers)
+      : super(repaint: Listenable.merge([buffer, beatMarkers]));
   // gives the buffer to the constructor, and the painter listens to it (repaint: buffer), so with every notifyListeners() the painter is called and the chart is redrawn
 
   // BLE packet -> _processEkgData -> _chartBuffer.addAll -> notifyListeners() -> repaint: buffer -> _EkgPainter.paint
@@ -57,6 +68,8 @@ class _EkgPainter extends CustomPainter {
   final EkgBuffer buffer;
   final int sampleRateHz;
   final double mvPerBigSquare;
+  final String label;   // scale text in the top left corner, already translated
+  final ValueListenable<List<int>>? beatMarkers;
 
   static const double secondsPerBigSquare = 0.2;  // 1 big square = 0.2 s, 1 small square = 0.04 s (like paper at 25 mm/s)
 
@@ -113,7 +126,24 @@ class _EkgPainter extends CustomPainter {
     }
     // cascade with 3 setters, the line is black, 1.5 px wide, and only the line is drawn, not a filled shape
 
+    _drawBeatMarkers(canvas, size, pxPerSecond / sampleRateHz);
     _drawLabel(canvas);
+  }
+
+  // a small red triangle at the bottom edge under every R wave, pointing up at it
+  void _drawBeatMarkers(Canvas canvas, Size size, double xStep) {
+    List<int>? markers = beatMarkers?.value;
+    if (markers == null || markers.isEmpty) return;
+    Paint red = Paint()..color = Colors.red;
+    for (int position in markers) {
+      double x = position * xStep;
+      Path triangle = Path()
+        ..moveTo(x, size.height - 10)       // tip
+        ..lineTo(x - 5, size.height)        // bottom left
+        ..lineTo(x + 5, size.height)        // bottom right
+        ..close();
+      canvas.drawPath(triangle, red);
+    }
   }
 
   // grid lines start at the 0 mV line / left edge and go outward every small square,
@@ -153,7 +183,7 @@ class _EkgPainter extends CustomPainter {
   void _drawLabel(Canvas canvas) {
     TextPainter label = TextPainter(
       text: TextSpan(
-        text: EkgChart.scaleLabel(secondsPerBigSquare, mvPerBigSquare),
+        text: this.label,   // the field: the TextPainter made on this line is also called label
         style: const TextStyle(color: Colors.black54, fontSize: 11),
       ),
       textDirection: TextDirection.ltr,
@@ -170,7 +200,9 @@ class _EkgPainter extends CustomPainter {
   bool shouldRepaint(covariant _EkgPainter oldDelegate) =>
       oldDelegate.buffer != buffer ||
       oldDelegate.sampleRateHz != sampleRateHz ||
-      oldDelegate.mvPerBigSquare != mvPerBigSquare;
+      oldDelegate.mvPerBigSquare != mvPerBigSquare ||
+      oldDelegate.label != label ||   // e.g. the language was changed
+      oldDelegate.beatMarkers != beatMarkers;
 } // with every build() a new _EkgPainter is created, flutter asks if the new painter is goin gtoi draw something different than the previous one, if not then its skispped
 // new data is taken care of by repaint: buffer, so here e compare only settings, with changing x1/x2/x4 the result is true
 // covariant narrows the type of the parameter; the base class calls it a CustomPainter, covariant says its always gonna be _EkgPainter

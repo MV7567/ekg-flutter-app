@@ -19,4 +19,21 @@ void main() {
       expect(AppSettings.parseThemeMode(mode.name), mode);
     }
   });
+
+  test('recording length: only values from the list, anything else -> manual', () {
+    expect(AppSettings.parseRecordingSeconds(30), 30);
+    expect(AppSettings.parseRecordingSeconds(300), 300);
+    expect(AppSettings.parseRecordingSeconds(null), 0);   // nothing saved yet
+    expect(AppSettings.parseRecordingSeconds(45), 0);     // not in the list
+  });
+
+  test('language: only a translated one, anything else -> like the phone', () {
+    expect(AppSettings.parseLanguageCode('pl', ['en', 'pl']), 'pl');
+    expect(AppSettings.parseLanguageCode('de', ['en', 'pl']), '');   // no app_de.arb (yet)
+    expect(AppSettings.parseLanguageCode(null, ['en', 'pl']), '');   // nothing saved
+  });
+
+  test('every .arb file is a language: en and pl', () {
+    expect(AppSettings.supportedLanguageCodes, containsAll(['en', 'pl']));
+  });
 }

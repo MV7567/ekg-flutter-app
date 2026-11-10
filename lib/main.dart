@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';   // import ui stuff
-import 'screens/scanner_screen.dart';     // import scanner screen
+import 'screens/home_screen.dart';        // import start screen
 import 'settings/app_settings.dart';      // saved settings (theme)
+import 'l10n/app_localizations.dart';     // translations, generated from lib/l10n/*.arb
 
 // main entry point of the app
 // async: the saved settings are read before the first screen, so the app does not flash light -> dark
@@ -36,7 +37,12 @@ class EkgApp extends StatelessWidget {
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue, brightness: Brightness.dark),   // same blue but changed for the dark background
         ),
         themeMode: AppSettings.instance.themeMode,   // which one of the two is used, MaterialApp gets both motives, themeMode says which to use
-        home: const ScannerScreen(),                 // future settings can be added with getter and setter and a line in load()
+        // translations: our texts (AppLocalizations) + the built-in Flutter widgets (Material, Cupertino)
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,   // from the .arb files: en, pl
+        // null = the phone language if we have it, otherwise the first one (English)
+        locale: AppSettings.instance.locale,
+        home: const HomeScreen(),                   // the start screen, the first one the user sees
       ),
     );
     // MaterialApp is the skeleton of the app, manages navigation (Navigator), theme, language

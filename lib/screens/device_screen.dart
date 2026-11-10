@@ -4,10 +4,16 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';  // UUID, packetLengh
 import '../ekg_config.dart';                                // bytes -> samples
 import '../ekg_buffer.dart';                                // saving to CSV
 import '../ekg_packet_decoder.dart';                        // chart filters
+import '../l10n/app_localizations.dart';                   // translations
+import '../heart_rate_detector.dart';                       // bpm
 import '../ekg_test_signal.dart';                           // fake ESP32 (debug)
 import '../recording/csv_recorder.dart';                    // drawing the chart
 import '../filters/biquad_filter.dart';                     
 import '../widgets/ekg_chart.dart';
+import '../widgets/fullscreen_chart.dart';
+import '../widgets/heart_rate_text.dart';
+import '../settings/app_settings.dart';                     // recording length
+import 'instructions_screen.dart';                          // how to measure
 
 // device screen, stateful widget, because we need to update the UI when connecting and recording
 class DeviceScreen extends StatefulWidget {
@@ -18,7 +24,16 @@ class DeviceScreen extends StatefulWidget {
   const DeviceScreen({super.key, required BluetoothDevice this.device});
 
   // debug only: the app makes the signal itself (EkgTestSignal), no BLE, no board needed
-  const DeviceScreen.testSignal({super.key}) : device = null; // a regulat constructor requires a real device so during connect you cant accidentaly get null
+  const DeviceScreen.testSignal({super.key}) : device = null;
+
+  // text for the recording length: 0 -> "Manual", 30 -> "30 s", 120 -> "2 min", 90 -> "1:30"
+  // static so it can be tested
+  static String durationLabel(int seconds) {
+    if (seconds <= 0) return 'Manual';
+    if (seconds < 60) return '$seconds s';
+    if (seconds % 60 == 0) return '${seconds ~/ 60} min';
+    return '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
+  } // a regulat constructor requires a real device so during connect you cant accidentaly get null
   // the same scheme as the scanner, the main difference: widget gets the parameter device, meaning the device clicked in the scanner  (DeviceScreen(device: result.device)).
   // - required means, without this parameter the code wont compile
   // this.device assigns the parameter to the field immediately
@@ -67,12 +82,20 @@ class _DeviceScreenState extends State<DeviceScreen> {
   // filters for the chart only (0.5 Hz high-pass, 50 Hz + 100 Hz notch, 40 Hz low-pass),
   // the CSV file keeps the raw values, so they can be filtered differently later
   final EkgDisplayFilter _displayFilter = EkgDisplayFilter(sampleRateHz.toDouble());
+
+  // heart rate from the R waves of the filtered signal (see HeartRateDetector)
+  // ValueNotifier: the bpm text redraws by itself when the value changes, without setState
+  final HeartRateDetector _heartRate = HeartRateDetector(sampleRateHz);
+  final ValueNotifier<int?> _bpm = ValueNotifier(null);   // null = not known yet
   // chart filters: .toDouble() is needed because sampleRateHz is int, and the filters works on decimal vals
 
   // chart amplitude scale: how many mV one big square means
   // 0.5 = standard EKG paper (10 mm/mV), smaller value = bigger line
   double _mvPerBigSquare = 0.25;
   // scale form the switch x1/x2/x4
+
+  // timed recording: number of samples after which the recording stops, null = manual (until STOP)
+  int? _sampleLimit;
 
   // test signal mode: the generator calls _processEkgData like the BLE notifications do
   bool get _isTestSignal => widget.device == null;
@@ -124,7 +147,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
         _controlCharacteristic = null;
         if (_isRecording) {
           // if saving failed, _finishRecording already showed a warning
-          if (await _finishRecording()) _showMessage('Connection lost, recording saved');
+          if (await _finishRecording()) _showMessage((t) => t.deviceConnectionLost);
         }
       }
       // breaking the connection, 
@@ -141,7 +164,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
     } catch (e) {
       // e.g. the ESP32 is off or too far away, connect() gives up after 35 s
       debugPrint("Connection error: $e");
-      _showMessage('Could not connect, is the ESP32 powered on and nearby?');
+      _showMessage((t) => t.deviceCouldNotConnect);
     } finally {
       // finally runs always: after success and after an error
       if (mounted) setState(() => _isConnecting = false);
@@ -202,7 +225,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
       // without both characteristics the device is useless -> disconnect, so RECONNECT appears
       // instead of the "Searching for the EKG service..." spinner forever
       if (!foundDataCharacteristic || _controlCharacteristic == null) {
-        await _disconnectWithMessage('EKG service not found, is the right firmware uploaded?');
+        await _disconnectWithMessage((t) => t.deviceServiceNotFound);
         return;
       }
       if (mounted) setState(() {});
@@ -212,14 +235,14 @@ class _DeviceScreenState extends State<DeviceScreen> {
       debugPrint("Service discovery error: $e");
       // the same as above: no spinner forever, the user can try again
       if (widget.device!.isConnected) {
-        await _disconnectWithMessage('Could not read the EKG service, try to reconnect');
+        await _disconnectWithMessage((t) => t.deviceServiceReadError);
       }
     }
     // eg. disconnecting during discovering services
   }
 
   // shows why, then disconnects -> the state becomes disconnected and RECONNECT appears
-  Future<void> _disconnectWithMessage(String message) async {
+  Future<void> _disconnectWithMessage(String Function(AppLocalizations t) message) async {
     _showMessage(message);
     try {
       await widget.device!.disconnect();
@@ -242,16 +265,22 @@ class _DeviceScreenState extends State<DeviceScreen> {
     // "TEST_SIGNAL" in the CSV header, so test files are easy to tell apart in Recordings
     bool fileReady = await _recorder.open(deviceName: widget.device?.platformName ?? 'TEST_SIGNAL');
     if (!fileReady) {
-      _showMessage('Could not create the data file');
+      _showMessage((t) => t.deviceFileError);
       if (mounted) setState(() => _isBusy = false);   // the user could have left the screen during await
       return;
     }
     // First the file and then the ESP32 command. If the file can't be created there is no point to start the measurement. 
     // ! before a bool type means not. Unlike ! w _bleSubscription which means not null
 
+    // timed recording: the length is fixed now, changing the choice later does not change this recording
+    int seconds = AppSettings.instance.recordingSeconds;
+    _sampleLimit = seconds > 0 ? seconds * sampleRateHz : null;
+
     _decoder.reset();
     _chartBuffer.clear();   // the chart starts empty for every recording
     _displayFilter.reset(); // and the filters forget the previous recording
+    _heartRate.reset();     // and the beat detector too
+    _bpm.value = null;
     _isRecording = true;   // set before the command, so the first packet is not ignored
     // readying new recording:
     // - packet counters
@@ -270,7 +299,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
       // on the esp32 ControlCallbacks::onWrite is called, which sets startRequested = true
     } catch (e) {
       debugPrint("Start command error: $e");
-      _showMessage('Could not send the start command');
+      _showMessage((t) => t.deviceStartError);
       await _finishRecording();
       if (mounted) setState(() => _isBusy = false);
       return;
@@ -318,7 +347,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
     // writes the rest, closes the file and registers it in the file manager
     bool saved = await _recorder.close();
-    if (!saved) _showMessage('Recording may be incomplete, the file could not be written');
+    if (!saved) _showMessage((t) => t.deviceIncomplete);
 
     if (mounted) setState(() {});
     return saved;
@@ -350,10 +379,14 @@ class _DeviceScreenState extends State<DeviceScreen> {
     List<double> packetMillivolts = [];
 
     for (int i = 0; i < packet.rawValues.length; i++) {
+      // timed recording: samples after the chosen length are not saved, the file is exactly 30 s etc.
+      if (_sampleLimit != null && packet.firstSampleIndex + i >= _sampleLimit!) break;
       int rawValue = packet.rawValues[i];
       _recorder.writeSample(packet.firstSampleIndex + i, rawValue);   // raw value to the file
       double millivolts = rawValue * millivoltsPerLsb;
-      packetMillivolts.add(_displayFilter.process(millivolts));   // filtered value for the chart
+      double filtered = _displayFilter.process(millivolts);
+      packetMillivolts.add(filtered);   // filtered value for the chart
+      _heartRate.addSample(packet.firstSampleIndex + i, filtered);   // and for the beat detector
     }
     // It's a classic for loop: start from i=0, condition i<10, and i++.
     // for every one of the 10 samples:
@@ -364,6 +397,20 @@ class _DeviceScreenState extends State<DeviceScreen> {
     _chartBuffer.addAll(packetMillivolts);
     // the full 10 samples goes to the buffer at once, (one call of notifyListeners()) and one redrawing the screen per packet.
     // With add for every sample with notification it would be 250 refreshes per sec and the phone screen shows 60 or 120 frames anyway
+
+    // ValueNotifier tells its listeners only when the number really changes
+    _bpm.value = _heartRate.bpm;
+
+    // the chosen length is reached -> stop like the STOP button,
+    // !_isBusy: the next packets arrive while stopping, stop only once
+    if (_sampleLimit != null && _decoder.sampleCount >= _sampleLimit! && !_isBusy) {
+      _finishTimedRecording();
+    }
+  }
+
+  Future<void> _finishTimedRecording() async {
+    await _stopRecording();
+    _showMessage((t) => t.deviceTimedFinished(DeviceScreen.durationLabel(_sampleLimit! ~/ sampleRateHz)));
   }
 
   // ---------------- leaving the screen ----------------
@@ -374,19 +421,20 @@ class _DeviceScreenState extends State<DeviceScreen> {
     if (didPop) return;
 
     // showDialog waits until the dialog is closed and returns the value given to pop()
+    AppLocalizations t = AppLocalizations.of(context);
     bool? leave = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Stop the recording?'),
-        content: const Text('The recording will be stopped and saved.'),
+        title: Text(t.deviceLeaveTitle),
+        content: Text(t.deviceLeaveContent),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('CANCEL'),
+            child: Text(t.commonCancel),
           ),
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('STOP AND LEAVE'),
+            child: Text(t.deviceStopAndLeave),
           ),
         ],
       ),
@@ -401,9 +449,14 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
   // ---------------- helpers ----------------
 
-  void _showMessage(String text) {
+  // gets a function that picks the text, e.g. (t) => t.deviceFileError:
+  // the text is chosen only after the mounted check, because AppLocalizations.of(context)
+  // can't be used any more when the screen is gone (messages often come after an await)
+  void _showMessage(String Function(AppLocalizations t) text) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(text(AppLocalizations.of(context)))),
+    );
   }
   // one space for snackbar, checks mounted, dont have to remeber about it with every 
 
@@ -436,6 +489,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
     widget.device?.disconnect().catchError((e) => debugPrint("Disconnect error: $e"));
     // 4. Free the chart buffer (it is a ChangeNotifier, the chart stops listening to it)
     _chartBuffer.dispose();
+    _bpm.dispose();
     super.dispose();
   }
 
@@ -443,8 +497,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
   String get _deviceTitle {
     BluetoothDevice? device = widget.device;
-    if (device == null) return 'Test signal (debug)';
-    return device.platformName.isEmpty ? "Unknown" : device.platformName;
+    if (device == null) return AppLocalizations.of(context).homeTestSignal;
+    return device.platformName.isEmpty ? AppLocalizations.of(context).deviceUnknown : device.platformName;
   }
 
   @override
@@ -453,14 +507,26 @@ class _DeviceScreenState extends State<DeviceScreen> {
     bool ready = connected && (_controlCharacteristic != null || _isTestSignal);
     bool connecting = _isConnecting && !connected;
     // additional variables to make condition statements more readable
+    AppLocalizations t = AppLocalizations.of(context);   // texts in the chosen language
 
     return Scaffold(
       appBar: AppBar(
         title: Text(_deviceTitle),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            tooltip: t.homeHowToMeasure,
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (context) => const InstructionsScreen()),
+            ),
+          ),
+        ],
       ),
       // the name of the device in the bar
       // PopScope: during a recording going back first asks (see _confirmLeave)
-      body: PopScope(
+      // SafeArea: not under the navigation bar (on the side in landscape)
+      body: SafeArea(
+        child: PopScope(
         canPop: !_isRecording,
         onPopInvokedWithResult: (didPop, result) => _confirmLeave(didPop),
         // LayoutBuilder gives the size of the free space (constraints), needed below
@@ -479,10 +545,18 @@ class _DeviceScreenState extends State<DeviceScreen> {
                   SizedBox( // the size and shape of the chart
                     height: 200,
                     width: double.infinity, // means as far as itll go
-                    child: EkgChart(
-                      buffer: _chartBuffer,
-                      sampleRateHz: sampleRateHz,
-                      mvPerBigSquare: _mvPerBigSquare,
+                    // Stack: the full screen button lies on top of the chart, top right corner
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: EkgChart(
+                            buffer: _chartBuffer,
+                            sampleRateHz: sampleRateHz,
+                            mvPerBigSquare: _mvPerBigSquare,
+                          ),
+                        ),
+                        Positioned(top: 0, right: 0, child: FullscreenButton(onPressed: _openFullscreen)),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 8),  // empty sized box as an element separator 
@@ -506,7 +580,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
                   // connection state
                   Text(
-                    _isTestSignal ? 'TEST SIGNAL' : (connecting ? 'CONNECTING...' : _connectionState.name.toUpperCase()),   // .name changes the enum value to text, and makes it uppercase
+                    _isTestSignal ? t.deviceStateTestSignal : (connecting ? t.deviceStateConnecting : (connected ? t.deviceStateConnected : t.deviceStateDisconnected)),   // .name changes the enum value to text, and makes it uppercase
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
@@ -522,7 +596,40 @@ class _DeviceScreenState extends State<DeviceScreen> {
                   if (connected && !ready) ...[
                     const CircularProgressIndicator(),
                     const SizedBox(height: 10),
-                    const Text('Searching for the EKG service...'),
+                    Text(t.deviceSearchingService),
+                  ],
+
+                  // recording length, only before START (a running recording keeps its length)
+                  if (ready && !_isRecording) ...[
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text('${t.deviceLength} '),
+                        DropdownButton<int>(
+                          value: AppSettings.instance.recordingSeconds,
+                          items: [
+                            for (int s in AppSettings.recordingSecondsOptions)
+                              DropdownMenuItem(
+                                value: s,
+                                child: Text(s == 0 ? t.deviceLengthManual : DeviceScreen.durationLabel(s)),
+                              ),
+                          ],
+                          // saved, so the next recording (also after a restart) has the same length
+                          onChanged: (s) {
+                            if (s == null) return;
+                            AppSettings.instance.setRecordingSeconds(s);   // changes the value at once, saves in the background
+                            setState(() {});   // redraw the dropdown with the new value
+                          },
+                        ),
+                      ],
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (context) => const InstructionsScreen()),
+                      ),
+                      child: Text(t.deviceWhereElectrodes),
+                    ),
+                    const SizedBox(height: 10),
                   ],
 
                   // start / stop button
@@ -536,7 +643,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                         ),
                         onPressed: _isBusy ? null : (_isRecording ? _stopRecording : _startRecording),  // null, stop or start
                         icon: Icon(_isRecording ? Icons.stop : Icons.play_arrow),
-                        label: Text(_isRecording ? 'STOP' : 'START', style: const TextStyle(fontSize: 20)),
+                        label: Text(_isRecording ? t.deviceStop : t.deviceStart, style: const TextStyle(fontSize: 20)),
                       ),
                     ),
                     // all the properties depend on _isRecording so the button always matches the state
@@ -545,22 +652,33 @@ class _DeviceScreenState extends State<DeviceScreen> {
                   if (_isRecording) ...[
                     const SizedBox(height: 30),
                     Text(_recordingTime, style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold)),
+                    HeartRateText(bpm: _bpm, fontSize: 28),
+                    // timed recording: how much of the chosen length is done
+                    if (_sampleLimit != null) ...[
+                      Text(t.deviceOfLength(DeviceScreen.durationLabel(_sampleLimit! ~/ sampleRateHz))),
+                      const SizedBox(height: 6),
+                      SizedBox(
+                        width: 200,
+                        child: LinearProgressIndicator(
+                          value: (_decoder.sampleCount / _sampleLimit!).clamp(0.0, 1.0),   // 0..1
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 10),
-                    Text('Samples: ${_decoder.sampleCount}'),
-                    Text('Lost packets: ${_decoder.lostPackets}',
+                    Text(t.deviceSamples(_decoder.sampleCount)),
+                    Text(t.deviceLostPackets(_decoder.lostPackets),
                       style: TextStyle(color: _decoder.lostPackets > 0 ? Colors.orange : null)), // null colors means the default, 
                       // the lost packet list becomes orange when the number is bigger than zero
                     // packets of the wrong size are not saved, usually the MTU is too small
                     if (_decoder.badPackets > 0)
-                      Text('Rejected packets: ${_decoder.badPackets} '
-                          '(length ${_decoder.lastBadLength} instead of $packetLength, MTU ${widget.device?.mtuNow})',
+                      Text(t.deviceRejectedPackets(_decoder.badPackets, _decoder.lastBadLength, packetLength, '${widget.device?.mtuNow}'),
                         style: const TextStyle(color: Colors.red), textAlign: TextAlign.center),
                   ],
 
                   // last saved file
                   if (_recorder.filePath.isNotEmpty) ...[
                     const SizedBox(height: 30),
-                    Text(_isRecording ? 'Saving to:' : 'Last recording saved in:',
+                    Text(_isRecording ? t.deviceSavingTo : t.deviceLastSaved,
                       style: const TextStyle(fontSize: 14)),
                     Text(_recorder.filePath,
                       style: const TextStyle(fontSize: 12, color: Colors.grey), textAlign: TextAlign.center),
@@ -573,7 +691,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                     OutlinedButton.icon(
                       onPressed: _connectToDevice,
                       icon: const Icon(Icons.refresh),
-                      label: const Text('RECONNECT'),
+                      label: Text(t.deviceReconnect),
                     ),
                   ],
                 ],
@@ -582,6 +700,19 @@ class _DeviceScreenState extends State<DeviceScreen> {
           ),
         ),
       ),
+      ),
     );
+  }
+
+  // the same chart buffer, so the live signal keeps drawing in full screen
+  Future<void> _openFullscreen() async {
+    double? mv = await FullscreenChartScreen.open(
+      context,
+      buffer: _chartBuffer,
+      sampleRateHz: sampleRateHz,
+      mvPerBigSquare: _mvPerBigSquare,
+      bpm: _bpm,   // the heart rate is shown there too
+    );
+    if (mv != null && mounted) setState(() => _mvPerBigSquare = mv);   // zoom chosen in full screen
   }
 }

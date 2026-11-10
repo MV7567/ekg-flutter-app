@@ -1,9 +1,10 @@
 import 'dart:convert';                              // utf8
 import 'dart:io';                                   // File, Directory, RandomAccessFile
-import 'package:flutter/foundation.dart';           // debugPrint, Float32List
+import 'package:flutter/foundation.dart';           // debugPrint, Float32List, Int32List
 import 'package:path_provider/path_provider.dart';  // the app's own folder
 import '../ekg_config.dart';                        // sampleRateHz, millivoltsPerLsb
 import '../filters/biquad_filter.dart';             // EkgDisplayFilter
+import '../heart_rate_detector.dart';                // beats in a whole recording
 import 'csv_recorder.dart';                         // publicDownloadPath
 
 // information about one saved recording, read from its header and last line,
@@ -106,6 +107,14 @@ class RecordingInfo {
     return millivolts;
   }
 
+  // everything the view screen needs, in one trip to the background isolate:
+  // the filtered samples and the heart beats found in them
+  static RecordingData loadForView(String path) {
+    Float32List millivolts = loadFilteredMillivolts(path);
+    List<int> beats = HeartRateDetector.findBeats(millivolts, sampleRateHz);
+    return RecordingData(millivolts, Int32List.fromList(beats));
+  }
+
   // ---- pure functions below: no files, so they can be tested ----
 
   // "sample,time_s,raw,mV" lines -> mV values, the index in the list = the sample number
@@ -190,4 +199,13 @@ class RecordingInfo {
     }
     return Duration.zero;   // only the header, no samples
   }
+}
+
+// a loaded recording for the view screen
+// a plain class with typed lists, so compute() can send it back from the background isolate
+class RecordingData {
+  RecordingData(this.millivolts, this.beats);
+
+  final Float32List millivolts;   // filtered samples, index = sample number
+  final Int32List beats;          // sample numbers of the R waves, in order
 }

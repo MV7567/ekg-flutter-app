@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';                       // import ui stuff
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';    // import bluetooth stuff
 import 'package:permission_handler/permission_handler.dart';  // import permission stuff
 import '../ekg_config.dart';  //higher up folder
+import '../l10n/app_localizations.dart';
 import 'device_screen.dart';
 import 'recordings_screen.dart';
 import 'settings_screen.dart';
@@ -118,8 +119,8 @@ class _ScannerScreenState extends State<ScannerScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text('The app needs the Bluetooth permission to find the EKG device'),
-        action: SnackBarAction(label: 'SETTINGS', onPressed: openAppSettings),
+        content: Text(AppLocalizations.of(context).scannerPermissionNeeded),
+        action: SnackBarAction(label: AppLocalizations.of(context).scannerOpenSettings, onPressed: openAppSettings),
       ),
     );
   }
@@ -155,7 +156,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
       debugPrint("Scan error: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Scan failed, check if Bluetooth is on: $e')),
+          SnackBar(content: Text(AppLocalizations.of(context).scannerScanFailed('$e'))),
         );
       }
     }
@@ -170,15 +171,16 @@ class _ScannerScreenState extends State<ScannerScreen> {
   @override
   // BUILD the UI
   Widget build(BuildContext context) {
+    AppLocalizations t = AppLocalizations.of(context);   // texts in the chosen language
     return Scaffold(    // basic visual skeleton
       appBar: AppBar(   // top bar
-        title: const Text('Search for EKG Devices'),
+        title: Text(t.scannerTitle),
         actions: [      // actions is the icon spot on the right side of AppBar.
           // kDebugMode is a constant: false in a release build, so this button is not even compiled in
           if (kDebugMode) // only true for flutter run, not flutter build apk --release
             IconButton(
               icon: const Icon(Icons.science),
-              tooltip: 'Test signal (debug)',
+              tooltip: t.homeTestSignal,
               onPressed: () {
                 FlutterBluePlus.stopScan();
                 Navigator.of(context).push(
@@ -188,14 +190,14 @@ class _ScannerScreenState extends State<ScannerScreen> {
             ),
           IconButton(
             icon: const Icon(Icons.folder_open),
-            tooltip: 'Recordings',      // subtitle that shows up when held down
+            tooltip: t.homeRecordings,      // subtitle that shows up when held down
             onPressed: () => Navigator.of(context).push(      // same navigator push as CONNECT
               MaterialPageRoute(builder: (context) => const RecordingsScreen()),
             ),
           ),
           IconButton(
             icon: const Icon(Icons.settings),
-            tooltip: 'Settings',
+            tooltip: t.homeSettings,
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (context) => const SettingsScreen()),
             ),
@@ -211,10 +213,10 @@ class _ScannerScreenState extends State<ScannerScreen> {
                 padding: const EdgeInsets.all(32),
                 child: Text(
                   _isScanning
-                      ? 'Searching...'
+                      ? t.scannerSearching
                       : _hasScanned
-                          ? 'No EKG device found.\nCheck if the ESP32 is powered on and try again.'
-                          : 'Press the search button to find the ESP32_EKG device.',
+                          ? t.scannerNothingFound
+                          : t.scannerHint,
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -228,7 +230,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
                 // itembuilder is called for every index  from 0 to itemCount-1
                 String deviceName = result.device.platformName;
                 if (deviceName.isEmpty) {
-                  deviceName = "Unknown Device";
+                  deviceName = t.scannerUnknownDevice;
                 }
                 // platformName is the name from the advertising, in this case "ESP32_EKG"
                 // the full name is visible thanks to setScanResponse(true) in the firmware
@@ -239,7 +241,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
                   // ListTIle is a standard list element =, icon on the left title, subtitle, and element on the right
                   // remoteId is the MAC address of the device
                   trailing: ElevatedButton(               // button on the right side of the tile
-                    child: const Text('CONNECT'),         // button text
+                    child: Text(t.scannerConnect),         // button text
                     onPressed: () {                       // what happens when the button is pressed
                       FlutterBluePlus.stopScan();         // stop scanning before connect attempt
                       Navigator.of(context).push(

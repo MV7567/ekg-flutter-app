@@ -1,0 +1,175 @@
+import 'package:flutter/foundation.dart';   // ValueListenable
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';   // SystemChrome: orientation and system bars
+import '../ekg_buffer.dart';
+import '../l10n/app_localizations.dart';
+import 'ekg_chart.dart';
+import 'heart_rate_text.dart';
+
+// the chart over the whole screen, turned to landscape, without the status and navigation bars,
+// like full screen video on YouTube
+// it shows the SAME buffer as the screen below, so a live recording keeps drawing here
+class FullscreenChartScreen extends StatefulWidget {
+  const FullscreenChartScreen({
+    super.key,
+    required this.buffer,
+    required this.sampleRateHz,
+    required this.mvPerBigSquare,
+    this.onDragSamples,
+    this.bpm,
+    this.beatMarkers,
+  });
+
+  final EkgBuffer buffer;
+  final int sampleRateHz;
+  final double mvPerBigSquare;
+  // only for recordings: a drag moves the window by this many samples (null = live, no dragging)
+  final void Function(int samples)? onDragSamples;
+  // the heart rate under the scale text: live, or of the 5 s window of a recording (null = not shown)
+  final ValueListenable<int?>? bpm;
+  // only recordings: where the R waves are in the buffer (see EkgChart)
+  final ValueListenable<List<int>>? beatMarkers;
+
+  // opens the screen, returns the zoom chosen there, so the screen below can take it over
+  static Future<double?> open(
+    BuildContext context, {
+    required EkgBuffer buffer,
+    required int sampleRateHz,
+    required double mvPerBigSquare,
+    void Function(int samples)? onDragSamples,
+    ValueListenable<int?>? bpm,
+    ValueListenable<List<int>>? beatMarkers,
+  }) {
+    return Navigator.of(context).push<double>(MaterialPageRoute(
+      builder: (context) => FullscreenChartScreen(
+        buffer: buffer,
+        sampleRateHz: sampleRateHz,
+        mvPerBigSquare: mvPerBigSquare,
+        onDragSamples: onDragSamples,
+        bpm: bpm,
+        beatMarkers: beatMarkers,
+      ),
+    ));
+  }
+
+  // ×1 -> ×2 -> ×4 -> ×1, the same values as the SegmentedButton on the other screens
+  static const List<double> zoomSteps = [0.5, 0.25, 0.125];
+
+  static double nextZoom(double mvPerBigSquare) {
+    int i = zoomSteps.indexOf(mvPerBigSquare);
+    return zoomSteps[(i + 1) % zoomSteps.length];   // unknown value (-1) -> the first one
+  }
+
+  static String zoomLabel(double mvPerBigSquare) => '×${(0.5 / mvPerBigSquare).round()}';
+
+  @override
+  State<FullscreenChartScreen> createState() => _FullscreenChartScreenState();
+}
+
+class _FullscreenChartScreenState extends State<FullscreenChartScreen> {
+  late double _mvPerBigSquare = widget.mvPerBigSquare;
+
+  @override
+  void initState() {
+    super.initState();
+    // only the two landscape directions, the phone can still be turned 180°
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+    // hide the status and navigation bars, a swipe from the edge shows them for a moment
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  }
+
+  @override
+  void dispose() {
+    // back to normal: every orientation allowed again, bars visible
+    SystemChrome.setPreferredOrientations([]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // the back gesture also gives the zoom back, not only the exit button
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) Navigator.of(context).pop(_mvPerBigSquare);
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        // SafeArea: keeps the chart away from the camera cut-out in landscape
+        body: SafeArea(
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: LayoutBuilder(
+                  builder: (context, constraints) => GestureDetector(
+                    onHorizontalDragUpdate: widget.onDragSamples == null
+                        ? null
+                        : (details) {
+                            // the whole buffer = the whole width, finger left = later
+                            double samplesPerPx = widget.buffer.capacity / constraints.maxWidth;
+                            widget.onDragSamples!(-(details.delta.dx * samplesPerPx).round());
+                          },
+                    child: EkgChart(
+                      buffer: widget.buffer,
+                      sampleRateHz: widget.sampleRateHz,
+                      mvPerBigSquare: _mvPerBigSquare,
+                      beatMarkers: widget.beatMarkers,
+                    ),
+                  ),
+                ),
+              ),
+              // heart rate under the scale text (the bottom edge has the beat markers),
+              // dark text: the chart paper is always light
+              if (widget.bpm != null)
+                Positioned(
+                  left: 8,
+                  top: 20,
+                  child: HeartRateText(bpm: widget.bpm!, fontSize: 22, color: Colors.black87),
+                ),
+              // buttons in the top right corner, the scale text is in the top left
+              Positioned(
+                top: 0,
+                right: 0,
+                child: Row(
+                  children: [
+                    TextButton(
+                      onPressed: () => setState(
+                          () => _mvPerBigSquare = FullscreenChartScreen.nextZoom(_mvPerBigSquare)),
+                      child: Text(FullscreenChartScreen.zoomLabel(_mvPerBigSquare),
+                          style: const TextStyle(color: Colors.black87, fontSize: 18)),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.fullscreen_exit, color: Colors.black87),
+                      tooltip: AppLocalizations.of(context).fullscreenExit,
+                      onPressed: () => Navigator.of(context).pop(_mvPerBigSquare),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// small button for the top right corner of a normal chart, opens the full screen
+class FullscreenButton extends StatelessWidget {
+  const FullscreenButton({super.key, required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.fullscreen, color: Colors.black87),   // dark, the chart paper is always light
+      tooltip: AppLocalizations.of(context).fullscreenEnter,
+      onPressed: onPressed,
+    );
+  }
+}

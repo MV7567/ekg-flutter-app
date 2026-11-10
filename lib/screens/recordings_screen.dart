@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 import '../recording/recording_file.dart';
 import 'recording_actions.dart';
 import 'recording_view_screen.dart';
@@ -13,8 +14,8 @@ class RecordingsScreen extends StatefulWidget {
   // ---- pure functions for the list texts, static so they can be tested ----
 
   // 2026-11-04 14:30:05, null -> "Unknown date"
-  static String formatStart(DateTime? start) {
-    if (start == null) return 'Unknown date';
+  static String formatStart(DateTime? start, AppLocalizations t) {
+    if (start == null) return t.recordingsUnknownDate;
     String two(int n) => n.toString().padLeft(2, '0');  // changes 9 to 09
     return '${start.year}-${two(start.month)}-${two(start.day)} '
         '${two(start.hour)}:${two(start.minute)}:${two(start.second)}';
@@ -69,8 +70,9 @@ class _RecordingsScreenState extends State<RecordingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    AppLocalizations t = AppLocalizations.of(context);   // texts in the chosen language
     return Scaffold(
-      appBar: AppBar(title: const Text('Recordings')),
+      appBar: AppBar(title: Text(t.homeRecordings)),
       body: FutureBuilder<List<RecordingInfo>>(     // list read in the background, listAll() returns Future because file reading is in progress, 
         future: _recordings,                        // in initState it saves this Future in _recordings, Future builder draws the screen depending on its state
         builder: (context, snapshot) {
@@ -78,7 +80,7 @@ class _RecordingsScreenState extends State<RecordingsScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {                  // error text obv
-            return Center(child: Text('Cannot read recordings:\n${snapshot.error}',
+            return Center(child: Text(t.recordingsReadError('${snapshot.error}'),
                 textAlign: TextAlign.center));
           }
           List<RecordingInfo> recordings = snapshot.data!;  // ready list
@@ -92,11 +94,10 @@ class _RecordingsScreenState extends State<RecordingsScreen> {
             // the same function will be used to refresh the list after file removal
             child: recordings.isEmpty
                 // ListView also for the empty text, RefreshIndicator needs something scrollable
-                ? ListView(children: const [
+                ? ListView(children: [
                     Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Text('No recordings yet.\nStart a recording on the device screen.',
-                          textAlign: TextAlign.center),
+                      padding: const EdgeInsets.all(32),
+                      child: Text(t.recordingsEmpty, textAlign: TextAlign.center),
                     ),
                   ])
                 : ListView.builder(
@@ -106,18 +107,18 @@ class _RecordingsScreenState extends State<RecordingsScreen> {
                       String device = r.deviceName.isEmpty ? '' : '  ·  ${r.deviceName}';
                       return ListTile(
                         leading: const Icon(Icons.monitor_heart),
-                        title: Text(RecordingsScreen.formatStart(r.start)),
+                        title: Text(RecordingsScreen.formatStart(r.start, t)),
                         subtitle: Text('${RecordingsScreen.formatDuration(r.duration)}  ·  '
                             '${RecordingsScreen.formatSize(r.sizeBytes)}$device'),
                         onTap: () => _open(r),
                         // ⋮ menu on the right
                         trailing: PopupMenuButton<String>(  // each position has value (share/delete)
                           onSelected: (action) => action == 'share' ? shareRecording(context, r) : _delete(r),   // decides what to do 
-                          itemBuilder: (context) => const [
+                          itemBuilder: (context) => [
                             PopupMenuItem(value: 'share', child: ListTile(  // ListTile so there can be an icon next to text
-                                leading: Icon(Icons.share), title: Text('Share'))),
+                                leading: const Icon(Icons.share), title: Text(t.commonShare))),
                             PopupMenuItem(value: 'delete', child: ListTile(
-                                leading: Icon(Icons.delete, color: Colors.red), title: Text('Delete'))),
+                                leading: const Icon(Icons.delete, color: Colors.red), title: Text(t.commonDelete))),
                           ],
                         ),
                       );
