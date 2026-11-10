@@ -87,6 +87,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
   // ValueNotifier: the bpm text redraws by itself when the value changes, without setState
   final HeartRateDetector _heartRate = HeartRateDetector(sampleRateHz);
   final ValueNotifier<int?> _bpm = ValueNotifier(null);   // null = not known yet
+  // +1 on every detected beat, the heart next to the bpm jumps when it changes
+  final ValueNotifier<int> _beatCount = ValueNotifier(0);
   // chart filters: .toDouble() is needed because sampleRateHz is int, and the filters works on decimal vals
 
   // chart amplitude scale: how many mV one big square means
@@ -386,7 +388,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
       double millivolts = rawValue * millivoltsPerLsb;
       double filtered = _displayFilter.process(millivolts);
       packetMillivolts.add(filtered);   // filtered value for the chart
-      _heartRate.addSample(packet.firstSampleIndex + i, filtered);   // and for the beat detector
+      // and for the beat detector, true = this sample finished a beat
+      if (_heartRate.addSample(packet.firstSampleIndex + i, filtered)) _beatCount.value++;
     }
     // It's a classic for loop: start from i=0, condition i<10, and i++.
     // for every one of the 10 samples:
@@ -490,6 +493,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
     // 4. Free the chart buffer (it is a ChangeNotifier, the chart stops listening to it)
     _chartBuffer.dispose();
     _bpm.dispose();
+    _beatCount.dispose();
     super.dispose();
   }
 
@@ -652,7 +656,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                   if (_isRecording) ...[
                     const SizedBox(height: 30),
                     Text(_recordingTime, style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold)),
-                    HeartRateText(bpm: _bpm, fontSize: 28),
+                    HeartRateText(bpm: _bpm, beats: _beatCount, fontSize: 28),
                     // timed recording: how much of the chosen length is done
                     if (_sampleLimit != null) ...[
                       Text(t.deviceOfLength(DeviceScreen.durationLabel(_sampleLimit! ~/ sampleRateHz))),
@@ -712,6 +716,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
       sampleRateHz: sampleRateHz,
       mvPerBigSquare: _mvPerBigSquare,
       bpm: _bpm,   // the heart rate is shown there too
+      beats: _beatCount,
     );
     if (mv != null && mounted) setState(() => _mvPerBigSquare = mv);   // zoom chosen in full screen
   }

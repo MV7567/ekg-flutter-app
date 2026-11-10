@@ -66,6 +66,27 @@ class AppLocalizationsPl extends AppLocalizations {
   String get settingsLanguageSystem => 'Systemowy';
 
   @override
+  String get settingsColors => 'Kolory';
+
+  @override
+  String get paletteRed => 'Czerwony';
+
+  @override
+  String get paletteBlue => 'Niebieski';
+
+  @override
+  String get paletteTeal => 'Turkusowy';
+
+  @override
+  String get paletteGreen => 'Zielony';
+
+  @override
+  String get palettePurple => 'Fioletowy';
+
+  @override
+  String get paletteOrange => 'Pomarańczowy';
+
+  @override
   String get scannerTitle => 'Szukaj urządzeń EKG';
 
   @override

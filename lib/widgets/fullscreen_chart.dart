@@ -17,6 +17,7 @@ class FullscreenChartScreen extends StatefulWidget {
     required this.mvPerBigSquare,
     this.onDragSamples,
     this.bpm,
+    this.beats,
     this.beatMarkers,
   });
 
@@ -27,6 +28,8 @@ class FullscreenChartScreen extends StatefulWidget {
   final void Function(int samples)? onDragSamples;
   // the heart rate under the scale text: live, or of the 5 s window of a recording (null = not shown)
   final ValueListenable<int?>? bpm;
+  // only live: fires on every beat, the heart jumps (see HeartRateText)
+  final Listenable? beats;
   // only recordings: where the R waves are in the buffer (see EkgChart)
   final ValueListenable<List<int>>? beatMarkers;
 
@@ -38,6 +41,7 @@ class FullscreenChartScreen extends StatefulWidget {
     required double mvPerBigSquare,
     void Function(int samples)? onDragSamples,
     ValueListenable<int?>? bpm,
+    Listenable? beats,
     ValueListenable<List<int>>? beatMarkers,
   }) {
     return Navigator.of(context).push<double>(MaterialPageRoute(
@@ -47,6 +51,7 @@ class FullscreenChartScreen extends StatefulWidget {
         mvPerBigSquare: mvPerBigSquare,
         onDragSamples: onDragSamples,
         bpm: bpm,
+        beats: beats,
         beatMarkers: beatMarkers,
       ),
     ));
@@ -91,6 +96,7 @@ class _FullscreenChartScreenState extends State<FullscreenChartScreen> {
 
   @override
   Widget build(BuildContext context) {
+    EkgChartColors chartColors = EkgChartColors.of(context);   // for the buttons on the chart
     // the back gesture also gives the zoom back, not only the exit button
     return PopScope(
       canPop: false,
@@ -123,12 +129,12 @@ class _FullscreenChartScreenState extends State<FullscreenChartScreen> {
                 ),
               ),
               // heart rate under the scale text (the bottom edge has the beat markers),
-              // dark text: the chart paper is always light
+              // in the color that is readable on the chart (dark on paper, light on the monitor)
               if (widget.bpm != null)
                 Positioned(
                   left: 8,
                   top: 20,
-                  child: HeartRateText(bpm: widget.bpm!, fontSize: 22, color: Colors.black87),
+                  child: HeartRateText(bpm: widget.bpm!, beats: widget.beats, fontSize: 22, color: chartColors.controls),
                 ),
               // buttons in the top right corner, the scale text is in the top left
               Positioned(
@@ -140,10 +146,10 @@ class _FullscreenChartScreenState extends State<FullscreenChartScreen> {
                       onPressed: () => setState(
                           () => _mvPerBigSquare = FullscreenChartScreen.nextZoom(_mvPerBigSquare)),
                       child: Text(FullscreenChartScreen.zoomLabel(_mvPerBigSquare),
-                          style: const TextStyle(color: Colors.black87, fontSize: 18)),
+                          style: TextStyle(color: chartColors.controls, fontSize: 18)),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.fullscreen_exit, color: Colors.black87),
+                      icon: Icon(Icons.fullscreen_exit, color: chartColors.controls),
                       tooltip: AppLocalizations.of(context).fullscreenExit,
                       onPressed: () => Navigator.of(context).pop(_mvPerBigSquare),
                     ),
@@ -167,7 +173,8 @@ class FullscreenButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconButton(
-      icon: const Icon(Icons.fullscreen, color: Colors.black87),   // dark, the chart paper is always light
+      // dark on the paper, light on the monitor (dark theme)
+      icon: Icon(Icons.fullscreen, color: EkgChartColors.of(context).controls),
       tooltip: AppLocalizations.of(context).fullscreenEnter,
       onPressed: onPressed,
     );

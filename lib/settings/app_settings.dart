@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';                         // ThemeMode, ChangeNotifier
 import 'package:shared_preferences/shared_preferences.dart';    // small key-value storage on the phone
 import '../l10n/app_localizations.dart';                        // the list of translated languages
+import 'app_palette.dart';                                      // color palettes
 
 // app settings, kept on the phone between launches
 // one shared object (AppSettings.instance): the app (MaterialApp) listens to it,
@@ -16,11 +17,16 @@ class AppSettings extends ChangeNotifier {    // extends ChangeNotifier, works l
   static const String _themeModeKey = 'themeMode';
   static const String _recordingSecondsKey = 'recordingSeconds';
   static const String _languageKey = 'language';
+  static const String _paletteKey = 'palette';
 
   final SharedPreferencesAsync _prefs = SharedPreferencesAsync();
 
   ThemeMode _themeMode = ThemeMode.system;   // default: like the phone
   ThemeMode get themeMode => _themeMode;
+
+  // colors of the app, one seed color (see app_palette.dart)
+  AppPalette _palette = AppPalette.defaultPalette;
+  AppPalette get palette => _palette;
 
   // app language as a code: "en", "pl", ..., "" = like the phone
   String _languageCode = '';
@@ -40,6 +46,7 @@ class AppSettings extends ChangeNotifier {    // extends ChangeNotifier, works l
       _themeMode = parseThemeMode(await _prefs.getString(_themeModeKey));
       _recordingSeconds = parseRecordingSeconds(await _prefs.getInt(_recordingSecondsKey));
       _languageCode = parseLanguageCode(await _prefs.getString(_languageKey), supportedLanguageCodes);
+      _palette = AppPalette.parse(await _prefs.getString(_paletteKey));
     } catch (e) {
       // storage not readable -> the defaults stay, the app still starts
       debugPrint("Settings load error: $e");
@@ -52,6 +59,17 @@ class AppSettings extends ChangeNotifier {    // extends ChangeNotifier, works l
     notifyListeners();   // redraw at once, saving happens after
     try {
       await _prefs.setString(_themeModeKey, mode.name);   // saved as text: "system" / "light" / "dark"
+    } catch (e) {
+      debugPrint("Settings save error: $e");
+    }
+  }
+
+  Future<void> setPalette(AppPalette palette) async {
+    if (palette == _palette) return;
+    _palette = palette;
+    notifyListeners();   // MaterialApp builds the theme again, every screen changes color at once
+    try {
+      await _prefs.setString(_paletteKey, palette.name);   // saved as text: "red", "teal", ...
     } catch (e) {
       debugPrint("Settings save error: $e");
     }

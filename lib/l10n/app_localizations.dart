@@ -212,6 +212,48 @@ abstract class AppLocalizations {
   /// **'System'**
   String get settingsLanguageSystem;
 
+  /// No description provided for @settingsColors.
+  ///
+  /// In en, this message translates to:
+  /// **'Colors'**
+  String get settingsColors;
+
+  /// No description provided for @paletteRed.
+  ///
+  /// In en, this message translates to:
+  /// **'Red'**
+  String get paletteRed;
+
+  /// No description provided for @paletteBlue.
+  ///
+  /// In en, this message translates to:
+  /// **'Blue'**
+  String get paletteBlue;
+
+  /// No description provided for @paletteTeal.
+  ///
+  /// In en, this message translates to:
+  /// **'Teal'**
+  String get paletteTeal;
+
+  /// No description provided for @paletteGreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Green'**
+  String get paletteGreen;
+
+  /// No description provided for @palettePurple.
+  ///
+  /// In en, this message translates to:
+  /// **'Purple'**
+  String get palettePurple;
+
+  /// No description provided for @paletteOrange.
+  ///
+  /// In en, this message translates to:
+  /// **'Orange'**
+  String get paletteOrange;
+
   /// No description provided for @scannerTitle.
   ///
   /// In en, this message translates to:

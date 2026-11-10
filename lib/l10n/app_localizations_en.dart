@@ -66,6 +66,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsLanguageSystem => 'System';
 
   @override
+  String get settingsColors => 'Colors';
+
+  @override
+  String get paletteRed => 'Red';
+
+  @override
+  String get paletteBlue => 'Blue';
+
+  @override
+  String get paletteTeal => 'Teal';
+
+  @override
+  String get paletteGreen => 'Green';
+
+  @override
+  String get palettePurple => 'Purple';
+
+  @override
+  String get paletteOrange => 'Orange';
+
+  @override
   String get scannerTitle => 'Search for EKG Devices';
 
   @override

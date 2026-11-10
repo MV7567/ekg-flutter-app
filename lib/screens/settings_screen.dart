@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
+import '../settings/app_palette.dart';
 import '../settings/app_settings.dart';
 
 // settings, more sections can be added below
@@ -38,6 +39,26 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
 
+            _header(t.settingsColors),
+            // a row of color circles, Wrap goes to the next line when they don't fit
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  for (AppPalette palette in AppPalette.values)
+                    _PaletteCircle(
+                      palette: palette,
+                      label: palette.label(t),
+                      selected: palette == settings.palette,
+                      onTap: () => settings.setPalette(palette),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+
             _header(t.settingsLanguage),
             RadioGroup<String>(
               groupValue: settings.languageCode,
@@ -70,4 +91,58 @@ class SettingsScreen extends StatelessWidget {
 
   Widget _header(String text) =>
       ListTile(title: Text(text, style: const TextStyle(fontWeight: FontWeight.bold)));
+}
+
+// one palette in Settings: a circle in its main color with its name under it,
+// the chosen one has a tick and a ring around it
+class _PaletteCircle extends StatelessWidget {
+  const _PaletteCircle({
+    required this.palette,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final AppPalette palette;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    // the real main color of this palette in the current light/dark mode,
+    // fromSeed changes the seed a bit, so the circle shows what the buttons will really look like
+    ColorScheme colors = ColorScheme.fromSeed(seedColor: palette.seed, brightness: Theme.of(context).brightness);
+    Color ring = Theme.of(context).colorScheme.onSurface;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: SizedBox(
+          width: 72,   // the same width for every name, so the circles stay in neat columns
+          child: Column(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: colors.primary,
+                  shape: BoxShape.circle,
+                  border: selected ? Border.all(color: ring, width: 3) : null,
+                ),
+                // the tick in the color that is readable on this circle
+                child: selected
+                    ? Icon(Icons.check, color: colors.onPrimary)
+                    : null,
+              ),
+              const SizedBox(height: 4),
+              Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

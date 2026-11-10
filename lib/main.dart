@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';   // import ui stuff
 import 'screens/home_screen.dart';        // import start screen
 import 'settings/app_settings.dart';      // saved settings (theme)
+import 'settings/app_palette.dart';       // color palettes, buildAppTheme
 import 'l10n/app_localizations.dart';     // translations, generated from lib/l10n/*.arb
 
 // main entry point of the app
@@ -31,11 +32,10 @@ class EkgApp extends StatelessWidget {
       builder: (context, _) => MaterialApp(
         title: 'EKG App',
         // Material 3 ignores primarySwatch, the colors come from the colorScheme
-        theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue)),
+        // the palette chosen in Settings, the theme itself is made in app_palette.dart
+        theme: buildAppTheme(AppSettings.instance.palette, Brightness.light),
         // the same colors made for a dark background
-        darkTheme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue, brightness: Brightness.dark),   // same blue but changed for the dark background
-        ),
+        darkTheme: buildAppTheme(AppSettings.instance.palette, Brightness.dark),   // same blue but changed for the dark background
         themeMode: AppSettings.instance.themeMode,   // which one of the two is used, MaterialApp gets both motives, themeMode says which to use
         // translations: our texts (AppLocalizations) + the built-in Flutter widgets (Material, Cupertino)
         localizationsDelegates: AppLocalizations.localizationsDelegates,

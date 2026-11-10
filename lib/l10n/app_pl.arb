@@ -23,6 +23,13 @@
   "settingsThemeDark": "Ciemny",
   "settingsLanguage": "Język",
   "settingsLanguageSystem": "Systemowy",
+  "settingsColors": "Kolory",
+  "paletteRed": "Czerwony",
+  "paletteBlue": "Niebieski",
+  "paletteTeal": "Turkusowy",
+  "paletteGreen": "Zielony",
+  "palettePurple": "Fioletowy",
+  "paletteOrange": "Pomarańczowy",
 
   "scannerTitle": "Szukaj urządzeń EKG",
   "scannerPermissionNeeded": "Aplikacja potrzebuje uprawnienia Bluetooth, aby znaleźć urządzenie EKG",

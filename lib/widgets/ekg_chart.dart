@@ -44,8 +44,10 @@ class EkgChart extends StatelessWidget {
     // CustomPaint gives us a canvas, the drawing itself is done by _EkgPainter
     // the painter has no context, so the translated label is made here and passed in
     String label = scaleLabel(AppLocalizations.of(context), _EkgPainter.secondsPerBigSquare, mvPerBigSquare);
+    // the same for the colors: pink paper in the light theme, a dark monitor in the dark one
+    EkgChartColors colors = EkgChartColors.of(context);
     return CustomPaint(
-      painter: _EkgPainter(buffer, sampleRateHz, mvPerBigSquare, label, beatMarkers),
+      painter: _EkgPainter(buffer, sampleRateHz, mvPerBigSquare, label, beatMarkers, colors),
       size: Size.infinite,   // take all the space the parent gives
     );
   }
@@ -58,7 +60,7 @@ class _EkgPainter extends CustomPainter {
   // we use this because the pre made widget arent enough
   // size.infite means take up all the space from the parent
   // Listenable.merge: repaint when the buffer OR the markers change
-  _EkgPainter(this.buffer, this.sampleRateHz, this.mvPerBigSquare, this.label, this.beatMarkers)
+  _EkgPainter(this.buffer, this.sampleRateHz, this.mvPerBigSquare, this.label, this.beatMarkers, this.colors)
       : super(repaint: Listenable.merge([buffer, beatMarkers]));
   // gives the buffer to the constructor, and the painter listens to it (repaint: buffer), so with every notifyListeners() the painter is called and the chart is redrawn
 
@@ -70,6 +72,7 @@ class _EkgPainter extends CustomPainter {
   final double mvPerBigSquare;
   final String label;   // scale text in the top left corner, already translated
   final ValueListenable<List<int>>? beatMarkers;
+  final EkgChartColors colors;   // paper or monitor
 
   static const double secondsPerBigSquare = 0.2;  // 1 big square = 0.2 s, 1 small square = 0.04 s (like paper at 25 mm/s)
 
@@ -81,7 +84,7 @@ class _EkgPainter extends CustomPainter {
     // clip react cuts everything besides the created rectangle
 
     // background, light pink like EKG paper
-    canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFFFFF5F5));
+    canvas.drawRect(Offset.zero & size, Paint()..color = colors.background);
     // the paint brush, .. is a cascade operator, it allows you to call multiple methods on the same object without repeating the object name
 
     // 1. scale: how many pixels is 1 second and 1 mV
@@ -119,7 +122,7 @@ class _EkgPainter extends CustomPainter {
 
       // 3. draw the line
       Paint linePaint = Paint()
-        ..color = Colors.black
+        ..color = colors.line
         ..strokeWidth = 1.5
         ..style = PaintingStyle.stroke;   // only the line, not a filled shape
       canvas.drawPath(path, linePaint);
@@ -134,7 +137,7 @@ class _EkgPainter extends CustomPainter {
   void _drawBeatMarkers(Canvas canvas, Size size, double xStep) {
     List<int>? markers = beatMarkers?.value;
     if (markers == null || markers.isEmpty) return;
-    Paint red = Paint()..color = Colors.red;
+    Paint red = Paint()..color = colors.marker;
     for (int position in markers) {
       double x = position * xStep;
       Path triangle = Path()
@@ -154,10 +157,10 @@ class _EkgPainter extends CustomPainter {
     bool drawSmall = smallSquarePx >= 4;
 
     Paint smallPaint = Paint()
-      ..color = const Color(0xFFF8C8C8)
+      ..color = colors.smallGrid
       ..strokeWidth = 0.5;
     Paint bigPaint = Paint()
-      ..color = const Color(0xFFE88888)
+      ..color = colors.bigGrid
       ..strokeWidth = 1;
 
     // vertical lines = time
@@ -184,7 +187,7 @@ class _EkgPainter extends CustomPainter {
     TextPainter label = TextPainter(
       text: TextSpan(
         text: this.label,   // the field: the TextPainter made on this line is also called label
-        style: const TextStyle(color: Colors.black54, fontSize: 11),
+        style: TextStyle(color: colors.label, fontSize: 11),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
@@ -202,7 +205,57 @@ class _EkgPainter extends CustomPainter {
       oldDelegate.sampleRateHz != sampleRateHz ||
       oldDelegate.mvPerBigSquare != mvPerBigSquare ||
       oldDelegate.label != label ||   // e.g. the language was changed
-      oldDelegate.beatMarkers != beatMarkers;
+      oldDelegate.beatMarkers != beatMarkers ||
+      oldDelegate.colors != colors;   // light <-> dark theme
 } // with every build() a new _EkgPainter is created, flutter asks if the new painter is goin gtoi draw something different than the previous one, if not then its skispped
 // new data is taken care of by repaint: buffer, so here e compare only settings, with changing x1/x2/x4 the result is true
 // covariant narrows the type of the parameter; the base class calls it a CustomPainter, covariant says its always gonna be _EkgPainter
+
+// the colors of the chart, one set for the light and one for the dark theme
+// public, so the buttons and texts lying ON the chart (full screen) can use the matching color
+class EkgChartColors {
+  const EkgChartColors({
+    required this.background,
+    required this.smallGrid,
+    required this.bigGrid,
+    required this.line,
+    required this.label,
+    required this.marker,
+    required this.controls,
+  });
+
+  final Color background;
+  final Color smallGrid;
+  final Color bigGrid;
+  final Color line;       // the EKG itself
+  final Color label;      // scale text in the corner
+  final Color marker;     // beat triangles
+  final Color controls;   // buttons and text on top of the chart
+
+  // like printed EKG paper: light pink, red grid, black line
+  static const EkgChartColors paper = EkgChartColors(
+    background: Color(0xFFFFF5F5),
+    smallGrid: Color(0xFFF8C8C8),
+    bigGrid: Color(0xFFE88888),
+    line: Colors.black,
+    label: Colors.black54,
+    marker: Colors.red,
+    controls: Colors.black87,
+  );
+
+  // like a hospital monitor: almost black, dark green grid, bright green line,
+  // does not dazzle in a dark room
+  static const EkgChartColors monitor = EkgChartColors(
+    background: Color(0xFF0B1410),
+    smallGrid: Color(0xFF15301F),
+    bigGrid: Color(0xFF235C38),
+    line: Color(0xFF3DFF7A),
+    label: Colors.white60,
+    marker: Color(0xFFFF5252),   // a lighter red, plain red is hard to see on black
+    controls: Colors.white70,
+  );
+
+  // the set for the current theme (Settings -> light / dark / system)
+  static EkgChartColors of(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark ? monitor : paper;
+}

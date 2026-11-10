@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ecg_ble_app/settings/app_palette.dart';
 import 'package:ecg_ble_app/settings/app_settings.dart';
 
 void main() {
@@ -35,5 +36,21 @@ void main() {
 
   test('every .arb file is a language: en and pl', () {
     expect(AppSettings.supportedLanguageCodes, containsAll(['en', 'pl']));
+  });
+
+  test('palette: every one survives saving as its name, anything else -> red', () {
+    for (AppPalette palette in AppPalette.values) {
+      expect(AppPalette.parse(palette.name), palette);
+    }
+    expect(AppPalette.parse(null), AppPalette.red);      // nothing saved yet
+    expect(AppPalette.parse('pink'), AppPalette.red);    // a palette that doesn't exist (anymore)
+  });
+
+  test('palette: light and dark theme from the same seed', () {
+    ThemeData light = buildAppTheme(AppPalette.teal, Brightness.light);
+    ThemeData dark = buildAppTheme(AppPalette.teal, Brightness.dark);
+    expect(light.colorScheme.brightness, Brightness.light);
+    expect(dark.colorScheme.brightness, Brightness.dark);
+    expect(light.colorScheme.primary, isNot(dark.colorScheme.primary));
   });
 }
