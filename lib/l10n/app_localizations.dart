@@ -218,6 +218,18 @@ abstract class AppLocalizations {
   /// **'Colors'**
   String get settingsColors;
 
+  /// No description provided for @settingsChartMatchesPalette.
+  ///
+  /// In en, this message translates to:
+  /// **'EKG chart in palette colors'**
+  String get settingsChartMatchesPalette;
+
+  /// No description provided for @settingsChartMatchesPaletteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Off: pink paper (light) / green monitor (dark)'**
+  String get settingsChartMatchesPaletteHint;
+
   /// No description provided for @paletteRed.
   ///
   /// In en, this message translates to:
@@ -565,6 +577,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{value} bpm'**
   String heartRate(String value);
+
+  /// No description provided for @qualityChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking the signal…'**
+  String get qualityChecking;
+
+  /// No description provided for @qualityGood.
+  ///
+  /// In en, this message translates to:
+  /// **'Good signal'**
+  String get qualityGood;
+
+  /// No description provided for @qualityNoisy.
+  ///
+  /// In en, this message translates to:
+  /// **'Noisy signal – sit still, relax your muscles, press the electrodes'**
+  String get qualityNoisy;
+
+  /// No description provided for @qualityNoBeats.
+  ///
+  /// In en, this message translates to:
+  /// **'No heart beats visible – check where the electrodes are'**
+  String get qualityNoBeats;
+
+  /// No description provided for @qualityFlat.
+  ///
+  /// In en, this message translates to:
+  /// **'No signal – is an electrode or cable disconnected?'**
+  String get qualityFlat;
+
+  /// No description provided for @qualityElectrodeOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Signal out of range – an electrode is off or loose'**
+  String get qualityElectrodeOff;
 
   /// Average heart rate of the whole recording
   ///

@@ -38,4 +38,24 @@ void main() {
     expect(AppSettings.instance.palette, AppPalette.teal);
     expect(find.byIcon(Icons.check), findsOneWidget);   // still only one tick, now on teal
   });
+
+  testWidgets('the chart switch turns the palette colors on and off', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: const SettingsScreen(),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(AppSettings.instance.chartMatchesPalette, isFalse);   // off by default
+    await tester.tap(find.text('EKG chart in palette colors'));
+    await tester.pumpAndSettle();
+    expect(AppSettings.instance.chartMatchesPalette, isTrue);
+    await tester.tap(find.text('EKG chart in palette colors'));
+    await tester.pumpAndSettle();
+    expect(AppSettings.instance.chartMatchesPalette, isFalse);
+  });
 }

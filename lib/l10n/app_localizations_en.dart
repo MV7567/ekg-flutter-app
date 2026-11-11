@@ -69,6 +69,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsColors => 'Colors';
 
   @override
+  String get settingsChartMatchesPalette => 'EKG chart in palette colors';
+
+  @override
+  String get settingsChartMatchesPaletteHint =>
+      'Off: pink paper (light) / green monitor (dark)';
+
+  @override
   String get paletteRed => 'Red';
 
   @override
@@ -279,6 +286,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String heartRate(String value) {
     return '$value bpm';
   }
+
+  @override
+  String get qualityChecking => 'Checking the signal…';
+
+  @override
+  String get qualityGood => 'Good signal';
+
+  @override
+  String get qualityNoisy =>
+      'Noisy signal – sit still, relax your muscles, press the electrodes';
+
+  @override
+  String get qualityNoBeats =>
+      'No heart beats visible – check where the electrodes are';
+
+  @override
+  String get qualityFlat =>
+      'No signal – is an electrode or cable disconnected?';
+
+  @override
+  String get qualityElectrodeOff =>
+      'Signal out of range – an electrode is off or loose';
 
   @override
   String viewAverageBpm(String value) {

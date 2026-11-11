@@ -213,7 +213,9 @@ class _EkgPainter extends CustomPainter {
 
 // the colors of the chart, one set for the light and one for the dark theme
 // public, so the buttons and texts lying ON the chart (full screen) can use the matching color
-class EkgChartColors {
+// ThemeExtension: our own part of the app theme, MaterialApp keeps it next to the colorScheme,
+// so every chart redraws by itself when the theme changes (palette, light/dark, the switch in Settings)
+class EkgChartColors extends ThemeExtension<EkgChartColors> {
   const EkgChartColors({
     required this.background,
     required this.smallGrid,
@@ -255,7 +257,67 @@ class EkgChartColors {
     controls: Colors.white70,
   );
 
-  // the set for the current theme (Settings -> light / dark / system)
-  static EkgChartColors of(BuildContext context) =>
-      Theme.of(context).brightness == Brightness.dark ? monitor : paper;
+  // the chart in the colors of the palette (Settings -> "EKG chart in palette colors")
+  // made from the colorScheme of the theme, so it works for every palette, light and dark
+  // the grid is the main color laid see-through over the background (alphaBlend)
+  factory EkgChartColors.fromScheme(ColorScheme scheme) {
+    bool dark = scheme.brightness == Brightness.dark;
+    Color background = Color.alphaBlend(scheme.primary.withValues(alpha: 0.05), scheme.surface);
+    return EkgChartColors(
+      background: background,
+      smallGrid: Color.alphaBlend(scheme.primary.withValues(alpha: dark ? 0.12 : 0.15), background),
+      bigGrid: Color.alphaBlend(scheme.primary.withValues(alpha: dark ? 0.35 : 0.45), background),
+      // light: a dark line like ink on paper, dark: the bright main color like on a monitor
+      line: dark ? scheme.primary : scheme.onSurface,
+      label: scheme.onSurfaceVariant,
+      marker: scheme.tertiary,   // the second color of the palette, stands out from the grid
+      controls: scheme.onSurface,
+    );
+  }
+
+  // the set of the current theme, a theme without our extension (e.g. in a test) gets paper / monitor
+  static EkgChartColors of(BuildContext context) {
+    ThemeData theme = Theme.of(context);
+    return theme.extension<EkgChartColors>() ??
+        (theme.brightness == Brightness.dark ? monitor : paper);
+  }
+
+  // ---- needed by ThemeExtension ----
+
+  // a copy with some colors changed (Flutter's convention, every part of a theme has it)
+  @override
+  EkgChartColors copyWith({
+    Color? background,
+    Color? smallGrid,
+    Color? bigGrid,
+    Color? line,
+    Color? label,
+    Color? marker,
+    Color? controls,
+  }) =>
+      EkgChartColors(
+        background: background ?? this.background,
+        smallGrid: smallGrid ?? this.smallGrid,
+        bigGrid: bigGrid ?? this.bigGrid,
+        line: line ?? this.line,
+        label: label ?? this.label,
+        marker: marker ?? this.marker,
+        controls: controls ?? this.controls,
+      );
+
+  // the colors in between two sets, t = 0..1: MaterialApp changes the theme smoothly (~200 ms),
+  // so the chart fades into the new colors together with the rest of the app
+  @override
+  EkgChartColors lerp(EkgChartColors? other, double t) {
+    if (other == null) return this;
+    return EkgChartColors(
+      background: Color.lerp(background, other.background, t)!,
+      smallGrid: Color.lerp(smallGrid, other.smallGrid, t)!,
+      bigGrid: Color.lerp(bigGrid, other.bigGrid, t)!,
+      line: Color.lerp(line, other.line, t)!,
+      label: Color.lerp(label, other.label, t)!,
+      marker: Color.lerp(marker, other.marker, t)!,
+      controls: Color.lerp(controls, other.controls, t)!,
+    );
+  }
 }

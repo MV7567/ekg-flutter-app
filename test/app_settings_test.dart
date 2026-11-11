@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ecg_ble_app/settings/app_palette.dart';
 import 'package:ecg_ble_app/settings/app_settings.dart';
+import 'package:ecg_ble_app/widgets/ekg_chart.dart';
 
 void main() {
   test('saved theme text is read back', () {
@@ -52,5 +53,32 @@ void main() {
     expect(light.colorScheme.brightness, Brightness.light);
     expect(dark.colorScheme.brightness, Brightness.dark);
     expect(light.colorScheme.primary, isNot(dark.colorScheme.primary));
+  });
+
+  test('chart colors: classic paper / monitor when the switch is off', () {
+    for (AppPalette palette in AppPalette.values) {
+      expect(buildAppTheme(palette, Brightness.light).extension<EkgChartColors>(), same(EkgChartColors.paper));
+      expect(buildAppTheme(palette, Brightness.dark).extension<EkgChartColors>(), same(EkgChartColors.monitor));
+    }
+  });
+
+  test('chart in palette colors: readable for every palette, light and dark', () {
+    for (AppPalette palette in AppPalette.values) {
+      for (Brightness brightness in Brightness.values) {
+        EkgChartColors c = buildAppTheme(palette, brightness, chartMatchesPalette: true)
+            .extension<EkgChartColors>()!;
+        double bg = c.background.computeLuminance();
+        String which = '${palette.name} ${brightness.name}';
+        // the line and the buttons clearly lighter / darker than the background
+        expect((c.line.computeLuminance() - bg).abs(), greaterThan(0.3), reason: which);
+        expect((c.controls.computeLuminance() - bg).abs(), greaterThan(0.3), reason: which);
+        // the big grid is visible, but weaker than the line
+        double grid = (c.bigGrid.computeLuminance() - bg).abs();
+        expect(grid, greaterThan(0.02), reason: which);
+        expect(grid, lessThan((c.line.computeLuminance() - bg).abs()), reason: which);
+        // the beat markers can be seen
+        expect((c.marker.computeLuminance() - bg).abs(), greaterThan(0.1), reason: which);
+      }
+    }
   });
 }

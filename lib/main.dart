@@ -33,9 +33,11 @@ class EkgApp extends StatelessWidget {
         title: 'EKG App',
         // Material 3 ignores primarySwatch, the colors come from the colorScheme
         // the palette chosen in Settings, the theme itself is made in app_palette.dart
-        theme: buildAppTheme(AppSettings.instance.palette, Brightness.light),
+        theme: buildAppTheme(AppSettings.instance.palette, Brightness.light,
+            chartMatchesPalette: AppSettings.instance.chartMatchesPalette),
         // the same colors made for a dark background
-        darkTheme: buildAppTheme(AppSettings.instance.palette, Brightness.dark),   // same blue but changed for the dark background
+        darkTheme: buildAppTheme(AppSettings.instance.palette, Brightness.dark,
+            chartMatchesPalette: AppSettings.instance.chartMatchesPalette),   // same blue but changed for the dark background
         themeMode: AppSettings.instance.themeMode,   // which one of the two is used, MaterialApp gets both motives, themeMode says which to use
         // translations: our texts (AppLocalizations) + the built-in Flutter widgets (Material, Cupertino)
         localizationsDelegates: AppLocalizations.localizationsDelegates,

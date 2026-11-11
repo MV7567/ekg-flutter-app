@@ -51,6 +51,13 @@ void main() {
     expect(detector.bpm, anyOf(isNull, lessThan(40)));
   });
 
+  test('slow smooth wave (moving, breathing) is not a heart beat', () {
+    // 0.5 mV high, regular, 1 per second, but far too slow for a QRS
+    var (detector, beats) = run((t) => 0.5 * sin(2 * pi * 1 * t), 20);
+    expect(beats, 0);
+    expect(detector.bpm, isNull);
+  });
+
   test('flat line after the beats (electrode off): bpm becomes unknown after 3 s', () {
     HeartRateDetector detector = HeartRateDetector(fs);
     EkgDisplayFilter filter = EkgDisplayFilter(fs.toDouble());

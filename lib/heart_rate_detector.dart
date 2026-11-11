@@ -39,6 +39,7 @@ class HeartRateDetector {
   double _humpMax = 0;              // highest value of the moving sum in this hump
   double _humpRAmplitude = 0;       // highest |EKG| in this hump, the R wave
   int _humpRIndex = 0;              // and where it was = the time of the beat
+  double _humpMaxSlope = 0;         // steepest |slope| in this hump, in mV per derivative step (8 ms)
 
   int? _lastBeat;                   // sample number of the last beat (its R wave)
   int _lastSample = 0;
@@ -47,6 +48,9 @@ class HeartRateDetector {
   static const int _rrToKeep = 5;          // bpm = median of the last 5 intervals
   static const int _rrNeeded = 3;          // bpm shown only after 3 intervals (4 beats), not after one lucky one
   static const double _minRMillivolts = 0.15;
+  // a QRS is steep: ~1 mV in 40 ms = 25 mV/s, a slow wave (breathing, moving) is much slower,
+  // under 4 mV/s it is no beat even if it is high and regular (a small 0.2 mV R wave still has ~5 mV/s)
+  static const double _minSlopeMillivoltsPerSecond = 4;
   static const double _minRrSeconds = 0.3; // 200 bpm
   static const double _maxRrSeconds = 2.0; // 30 bpm, a longer gap = lost signal, not a beat
   static const double _timeoutSeconds = 3; // no beat for 3 s -> bpm unknown
@@ -93,14 +97,22 @@ class HeartRateDetector {
     // and the beat time is where the EKG itself is the furthest from 0 = the top of the R wave
     if (_inHump) {
       if (integrated > _humpMax) _humpMax = integrated;
+      if (slope.abs() > _humpMaxSlope) _humpMaxSlope = slope.abs();
       if (millivolts.abs() > _humpRAmplitude) {
         _humpRAmplitude = millivolts.abs();
         _humpRIndex = sampleIndex;
       }
       // the hump ends when the sum falls under the threshold (or after 300 ms, wider is no QRS)
-      if (integrated < threshold || sampleIndex - _humpStart > 0.3 * sampleRateHz) {
+      if (integrated < threshold) {
         _inHump = false;
         return _endOfHump();
+      }
+      if (sampleIndex - _humpStart > 0.3 * sampleRateHz) {
+        // still above the threshold after 300 ms: too wide for a QRS (a slow wave, moving),
+        // it only teaches the noise level
+        _inHump = false;
+        _noiseLevel = 0.125 * _humpMax + 0.875 * _noiseLevel;
+        return false;
       }
       return false;
     }
@@ -113,6 +125,7 @@ class HeartRateDetector {
       _humpMax = integrated;
       _humpRAmplitude = millivolts.abs();
       _humpRIndex = sampleIndex;
+      _humpMaxSlope = slope.abs();
       return false;
     }
 
@@ -123,8 +136,10 @@ class HeartRateDetector {
 
   // the hump is over: was it a beat?
   bool _endOfHump() {
-    // a real QRS is at least ~0.15 mV high, smaller = noise, even if it is the biggest around
-    if (_humpRAmplitude < _minRMillivolts) {
+    // a real QRS is at least ~0.15 mV high and steep, otherwise = noise, even if it is the biggest around
+    // too flat (slope is the change over 2 samples, so per second it is * sampleRate / 2)
+    bool tooSlow = _humpMaxSlope * sampleRateHz / 2 < _minSlopeMillivoltsPerSecond;
+    if (_humpRAmplitude < _minRMillivolts || tooSlow) {
       _noiseLevel = 0.125 * _humpMax + 0.875 * _noiseLevel;
       return false;
     }

@@ -6,12 +6,14 @@ import '../ekg_buffer.dart';                                // saving to CSV
 import '../ekg_packet_decoder.dart';                        // chart filters
 import '../l10n/app_localizations.dart';                   // translations
 import '../heart_rate_detector.dart';                       // bpm
+import '../signal_quality.dart';                            // good signal / electrode off
 import '../ekg_test_signal.dart';                           // fake ESP32 (debug)
 import '../recording/csv_recorder.dart';                    // drawing the chart
 import '../filters/biquad_filter.dart';                     
 import '../widgets/ekg_chart.dart';
 import '../widgets/fullscreen_chart.dart';
 import '../widgets/heart_rate_text.dart';
+import '../widgets/signal_quality_text.dart';
 import '../settings/app_settings.dart';                     // recording length
 import 'instructions_screen.dart';                          // how to measure
 
@@ -89,6 +91,11 @@ class _DeviceScreenState extends State<DeviceScreen> {
   final ValueNotifier<int?> _bpm = ValueNotifier(null);   // null = not known yet
   // +1 on every detected beat, the heart next to the bpm jumps when it changes
   final ValueNotifier<int> _beatCount = ValueNotifier(0);
+  // how good the signal is (see SignalQualityMonitor), shown under the heart rate
+  // adcLimit: a raw sample near the int16 maximum (32767) = the input is out of range
+  final SignalQualityMonitor _qualityMonitor =
+      SignalQualityMonitor(sampleRateHz, adcLimitMillivolts: 32000 * millivoltsPerLsb);
+  final ValueNotifier<SignalQuality> _quality = ValueNotifier(SignalQuality.checking);
   // chart filters: .toDouble() is needed because sampleRateHz is int, and the filters works on decimal vals
 
   // chart amplitude scale: how many mV one big square means
@@ -283,6 +290,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
     _displayFilter.reset(); // and the filters forget the previous recording
     _heartRate.reset();     // and the beat detector too
     _bpm.value = null;
+    _qualityMonitor.reset();
+    _quality.value = SignalQuality.checking;
     _isRecording = true;   // set before the command, so the first packet is not ignored
     // readying new recording:
     // - packet counters
@@ -390,6 +399,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
       packetMillivolts.add(filtered);   // filtered value for the chart
       // and for the beat detector, true = this sample finished a beat
       if (_heartRate.addSample(packet.firstSampleIndex + i, filtered)) _beatCount.value++;
+      _qualityMonitor.addSample(millivolts, filtered);   // raw for "electrode off", filtered for the rest
     }
     // It's a classic for loop: start from i=0, condition i<10, and i++.
     // for every one of the 10 samples:
@@ -403,6 +413,10 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
     // ValueNotifier tells its listeners only when the number really changes
     _bpm.value = _heartRate.bpm;
+    // signal quality, needs to know how long ago the last beat was
+    int? lastBeat = _heartRate.lastBeat;
+    int lastSample = packet.firstSampleIndex + packet.rawValues.length - 1;
+    _quality.value = _qualityMonitor.update(lastBeat == null ? null : lastSample - lastBeat);
 
     // the chosen length is reached -> stop like the STOP button,
     // !_isBusy: the next packets arrive while stopping, stop only once
@@ -494,6 +508,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
     _chartBuffer.dispose();
     _bpm.dispose();
     _beatCount.dispose();
+    _quality.dispose();
     super.dispose();
   }
 
@@ -657,6 +672,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
                     const SizedBox(height: 30),
                     Text(_recordingTime, style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold)),
                     HeartRateText(bpm: _bpm, beats: _beatCount, fontSize: 28),
+                    const SizedBox(height: 6),
+                    SignalQualityText(quality: _quality),   // good / noisy / electrode off ...
                     // timed recording: how much of the chosen length is done
                     if (_sampleLimit != null) ...[
                       Text(t.deviceOfLength(DeviceScreen.durationLabel(_sampleLimit! ~/ sampleRateHz))),

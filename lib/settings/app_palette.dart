@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
+import '../widgets/ekg_chart.dart';   // EkgChartColors
 
 // color palettes to choose from in Settings
 // every palette is only ONE seed color, Material 3 (ColorScheme.fromSeed) makes the whole set
@@ -40,10 +41,15 @@ enum AppPalette {
 
 // the whole look of the app for one palette and light/dark,
 // one place, so the light and the dark theme can't drift apart
-ThemeData buildAppTheme(AppPalette palette, Brightness brightness) {
+// chartMatchesPalette: the EKG chart in the palette colors instead of paper / monitor
+ThemeData buildAppTheme(AppPalette palette, Brightness brightness, {bool chartMatchesPalette = false}) {
   ColorScheme colors = ColorScheme.fromSeed(seedColor: palette.seed, brightness: brightness);
+  EkgChartColors chartColors = chartMatchesPalette
+      ? EkgChartColors.fromScheme(colors)
+      : (brightness == Brightness.dark ? EkgChartColors.monitor : EkgChartColors.paper);
   return ThemeData(
     colorScheme: colors,
+    extensions: [chartColors],   // EkgChartColors.of(context) finds it here
     // rounder cards than the default, softer look
     cardTheme: const CardThemeData(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(16))),

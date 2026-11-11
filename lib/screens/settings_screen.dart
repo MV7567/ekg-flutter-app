@@ -58,6 +58,13 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
+            // the EKG chart: classic or in the palette colors
+            SwitchListTile(
+              title: Text(t.settingsChartMatchesPalette),
+              subtitle: Text(t.settingsChartMatchesPaletteHint),
+              value: settings.chartMatchesPalette,
+              onChanged: settings.setChartMatchesPalette,
+            ),
 
             _header(t.settingsLanguage),
             RadioGroup<String>(

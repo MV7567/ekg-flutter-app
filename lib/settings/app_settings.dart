@@ -18,6 +18,7 @@ class AppSettings extends ChangeNotifier {    // extends ChangeNotifier, works l
   static const String _recordingSecondsKey = 'recordingSeconds';
   static const String _languageKey = 'language';
   static const String _paletteKey = 'palette';
+  static const String _chartMatchesPaletteKey = 'chartMatchesPalette';
 
   final SharedPreferencesAsync _prefs = SharedPreferencesAsync();
 
@@ -27,6 +28,10 @@ class AppSettings extends ChangeNotifier {    // extends ChangeNotifier, works l
   // colors of the app, one seed color (see app_palette.dart)
   AppPalette _palette = AppPalette.defaultPalette;
   AppPalette get palette => _palette;
+
+  // false = the classic chart (pink paper / green monitor), true = in the palette colors
+  bool _chartMatchesPalette = false;
+  bool get chartMatchesPalette => _chartMatchesPalette;
 
   // app language as a code: "en", "pl", ..., "" = like the phone
   String _languageCode = '';
@@ -47,6 +52,7 @@ class AppSettings extends ChangeNotifier {    // extends ChangeNotifier, works l
       _recordingSeconds = parseRecordingSeconds(await _prefs.getInt(_recordingSecondsKey));
       _languageCode = parseLanguageCode(await _prefs.getString(_languageKey), supportedLanguageCodes);
       _palette = AppPalette.parse(await _prefs.getString(_paletteKey));
+      _chartMatchesPalette = await _prefs.getBool(_chartMatchesPaletteKey) ?? false;   // ?? false: nothing saved yet
     } catch (e) {
       // storage not readable -> the defaults stay, the app still starts
       debugPrint("Settings load error: $e");
@@ -70,6 +76,17 @@ class AppSettings extends ChangeNotifier {    // extends ChangeNotifier, works l
     notifyListeners();   // MaterialApp builds the theme again, every screen changes color at once
     try {
       await _prefs.setString(_paletteKey, palette.name);   // saved as text: "red", "teal", ...
+    } catch (e) {
+      debugPrint("Settings save error: $e");
+    }
+  }
+
+  Future<void> setChartMatchesPalette(bool value) async {
+    if (value == _chartMatchesPalette) return;
+    _chartMatchesPalette = value;
+    notifyListeners();   // MaterialApp makes the theme again, with the other chart colors
+    try {
+      await _prefs.setBool(_chartMatchesPaletteKey, value);
     } catch (e) {
       debugPrint("Settings save error: $e");
     }
