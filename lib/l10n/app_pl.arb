@@ -91,10 +91,11 @@
   "qualityChecking": "Sprawdzam sygnał…",
   "qualityGood": "Dobry sygnał",
   "qualityNoisy": "Zaszumiony sygnał – siedź spokojnie, rozluźnij mięśnie, dociśnij elektrody",
-  "qualityNoBeats": "Nie widać uderzeń serca – sprawdź ułożenie elektrod",
+  "qualityNoBeats": "Brak wyraźnych uderzeń serca – sprawdź elektrody",
   "qualityFlat": "Brak sygnału – odpięta elektroda lub kabel?",
   "qualityElectrodeOff": "Sygnał poza zakresem – elektroda odpięta lub luźna",
   "viewAverageBpm": "średnio {value} bpm",
+  "chartZoomAuto": "Auto",
   "chartScale": "1 kratka: {seconds} s × {millivolts} mV",
 
   "instrSafetyTitle": "Bezpieczeństwo",

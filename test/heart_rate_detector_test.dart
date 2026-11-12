@@ -110,4 +110,63 @@ void main() {
     expect(HeartRateDetector.bpmBetween(beats, 0, 1250, fs), 60);
     expect(HeartRateDetector.bpmBetween(beats, 2500, 3750, fs), 120);
   });
+
+  // ---- like the first real recordings (wrists, 2026-11-11) ----
+
+  // a small EKG (QRS ~0.2 mV, lead I on the wrists) under a big 2 mV mains hum at 49.9 Hz
+  double smallEkgWithHum(double t) =>
+      0.2 * EkgTestSignal.cleanEkgAt(t) + 2.0 * sin(2 * pi * 49.92 * t) + 0.6;
+
+  test('real-like: small QRS under a big 50 Hz hum is found', () {
+    // the old detector (no 5-15 Hz band-pass, learning during the filter jump) found 0 beats here
+    var (detector, beats) = run(smallEkgWithHum, 60);
+    expect(detector.bpm, closeTo(72, 2));
+    expect(beats, greaterThan(65));   // 72 beats in 60 s, minus learning
+  });
+
+  test('real-like: a big artifact (moving the cable) does not blind the detector', () {
+    // a 2 mV spike with ringing at 20 s, ~10x the QRS
+    double withArtifact(double t) {
+      double x = smallEkgWithHum(t);
+      if (t > 20 && t < 20.3) x += 2.0 * exp(-(t - 20) * 20) * sin(2 * pi * 30 * (t - 20));
+      return x;
+    }
+    HeartRateDetector detector = HeartRateDetector(fs);
+    EkgDisplayFilter filter = EkgDisplayFilter(fs.toDouble());
+    int beatsAfter = 0;
+    for (int i = 0; i < 30 * fs; i++) {
+      bool beat = detector.addSample(i, filter.process(withArtifact(i / fs)));
+      if (beat && i > 22 * fs) beatsAfter++;   // the 8 s from 22 s on: ~9-10 beats
+    }
+    expect(beatsAfter, greaterThanOrEqualTo(8));
+    expect(detector.bpm, closeTo(72, 2));
+    expect(detector.rhythmSteady, isTrue);
+  });
+
+  test('real-like: ONE sample of -100 mV (a broken frame) does not blind the detector', () {
+    // the recording 2026-11-12 16:23: one sample of -16384 (-100 mV) at 7 s, the detector found
+    // no beat for the next 13 s (the ringing after it pushed the noise level far up)
+    // this goes straight to the display filter, WITHOUT the spike remover, the worst case
+    HeartRateDetector detector = HeartRateDetector(fs);
+    EkgDisplayFilter filter = EkgDisplayFilter(fs.toDouble());
+    int spikeAt = 7 * fs;
+    List<int> beatsAfter = [];
+    for (int i = 0; i < 20 * fs; i++) {
+      double x = i == spikeAt ? -100.0 : smallEkgWithHum(i / fs);
+      if (detector.addSample(i, filter.process(x)) && i > spikeAt) beatsAfter.add(i);
+    }
+    // the first beat after it within ~3 s (the searchback halves the threshold every 1.5 s)
+    expect(beatsAfter.first - spikeAt, lessThan(3 * fs));
+    // and from 11 s on every beat again: 9 s at 72 bpm = ~10-11 beats
+    expect(beatsAfter.where((i) => i > 11 * fs).length, greaterThanOrEqualTo(10));
+  });
+
+  test('rhythmSteady: a heart yes, random "beats" from loose inputs no', () {
+    var (heart, _) = run(EkgTestSignal.millivoltsAt, 15);
+    expect(heart.rhythmSteady, isTrue);
+
+    Random random = Random(3);
+    var (loose, _) = run((t) => 42 + 0.17 * sin(2 * pi * 49.9 * t) + 0.15 * (random.nextDouble() - 0.5), 15);
+    expect(loose.rhythmSteady, isFalse);
+  });
 }

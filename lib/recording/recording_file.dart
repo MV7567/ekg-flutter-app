@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';           // debugPrint, Float32List, 
 import 'package:path_provider/path_provider.dart';  // the app's own folder
 import '../ekg_config.dart';                        // sampleRateHz, millivoltsPerLsb
 import '../filters/biquad_filter.dart';             // EkgDisplayFilter
+import '../filters/spike_remover.dart';             // the same spike removing as live
 import '../heart_rate_detector.dart';                // beats in a whole recording
 import 'csv_recorder.dart';                         // publicDownloadPath
 
@@ -101,8 +102,9 @@ class RecordingInfo {
     List<String> lines = File(path).readAsLinesSync();   // sync is ok, this is not the UI thread
     Float32List millivolts = parseMillivolts(lines);
     EkgDisplayFilter filter = EkgDisplayFilter(sampleRateHz.toDouble());
+    SpikeRemover spikeRemover = SpikeRemover();
     for (int i = 0; i < millivolts.length; i++) {
-      millivolts[i] = filter.process(millivolts[i]);
+      millivolts[i] = filter.process(spikeRemover.process(millivolts[i]));
     }
     return millivolts;
   }

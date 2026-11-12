@@ -5,6 +5,7 @@ import '../ekg_buffer.dart';
 import '../l10n/app_localizations.dart';
 import 'ekg_chart.dart';
 import 'heart_rate_text.dart';
+import 'zoom_selector.dart';
 
 // the chart over the whole screen, turned to landscape, without the status and navigation bars,
 // like full screen video on YouTube
@@ -56,16 +57,6 @@ class FullscreenChartScreen extends StatefulWidget {
       ),
     ));
   }
-
-  // ×1 -> ×2 -> ×4 -> ×1, the same values as the SegmentedButton on the other screens
-  static const List<double> zoomSteps = [0.5, 0.25, 0.125];
-
-  static double nextZoom(double mvPerBigSquare) {
-    int i = zoomSteps.indexOf(mvPerBigSquare);
-    return zoomSteps[(i + 1) % zoomSteps.length];   // unknown value (-1) -> the first one
-  }
-
-  static String zoomLabel(double mvPerBigSquare) => '×${(0.5 / mvPerBigSquare).round()}';
 
   @override
   State<FullscreenChartScreen> createState() => _FullscreenChartScreenState();
@@ -144,8 +135,8 @@ class _FullscreenChartScreenState extends State<FullscreenChartScreen> {
                   children: [
                     TextButton(
                       onPressed: () => setState(
-                          () => _mvPerBigSquare = FullscreenChartScreen.nextZoom(_mvPerBigSquare)),
-                      child: Text(FullscreenChartScreen.zoomLabel(_mvPerBigSquare),
+                          () => _mvPerBigSquare = ZoomSelector.next(_mvPerBigSquare)),   // Auto -> ×1 -> ... -> ×8 -> Auto
+                      child: Text(ZoomSelector.label(_mvPerBigSquare, AppLocalizations.of(context)),
                           style: TextStyle(color: chartColors.controls, fontSize: 18)),
                     ),
                     IconButton(

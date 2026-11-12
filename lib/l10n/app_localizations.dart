@@ -599,7 +599,7 @@ abstract class AppLocalizations {
   /// No description provided for @qualityNoBeats.
   ///
   /// In en, this message translates to:
-  /// **'No heart beats visible – check where the electrodes are'**
+  /// **'No clear heart beats – check the electrodes'**
   String get qualityNoBeats;
 
   /// No description provided for @qualityFlat.
@@ -619,6 +619,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'average {value} bpm'**
   String viewAverageBpm(String value);
+
+  /// No description provided for @chartZoomAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get chartZoomAuto;
 
   /// Scale of the EKG paper, top left of the chart
   ///

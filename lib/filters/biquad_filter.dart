@@ -98,13 +98,16 @@ class BiquadFilter {
 
 // the filters used for the EKG chart, one after another: Connects 4 biquad filters for the chart
 //  1. high-pass 0.5 Hz - removes the offset (~ -9 mV) and the slow drift of the line (breathing, movement)
-//  2. notch 50 Hz  - mains hum
+//  2. notch 50 Hz  - mains hum, TWICE: the mains is often 49.9 Hz, not exactly 50, there one notch
+//                    removes "only" ~99 % (a 3 mV hum left 0.03 mV of ripple in a real recording),
+//                    two in a row ~99.99 %, the EKG below 40 Hz loses only a few %
 //  3. notch 100 Hz - 2nd harmonic of the mains hum (the hum is not a clean sine)
 //  4. low-pass 40 Hz - remaining fast noise, the EKG has almost nothing above 40 Hz
 class EkgDisplayFilter {
   EkgDisplayFilter(double sampleRateHz)
       : _highPass = BiquadFilter.highPass(frequencyHz: 0.5, sampleRateHz: sampleRateHz),
         _notch50 = BiquadFilter.notch(frequencyHz: 50, sampleRateHz: sampleRateHz),
+        _notch50Again = BiquadFilter.notch(frequencyHz: 50, sampleRateHz: sampleRateHz),
         // 100 Hz can only be filtered below the Nyquist frequency (needs more than 200 SPS),
         // otherwise null = no 100 Hz notch (at lower rates the low-pass already removes it)
         _notch100 = 100 < sampleRateHz / 2
@@ -112,7 +115,7 @@ class EkgDisplayFilter {
             : null,
         _lowPass = BiquadFilter.lowPass(frequencyHz: 40, sampleRateHz: sampleRateHz);
 
-  final BiquadFilter _highPass, _notch50, _lowPass;
+  final BiquadFilter _highPass, _notch50, _notch50Again, _lowPass;
   final BiquadFilter? _notch100;
 
   // false until the first sample arrives
@@ -126,7 +129,7 @@ class EkgDisplayFilter {
       _highPass.prime(x, 0);
       _primed = true;
     }
-    double y = _notch50.process(_highPass.process(x));
+    double y = _notch50Again.process(_notch50.process(_highPass.process(x)));
     if (_notch100 != null) y = _notch100.process(y);
     return _lowPass.process(y);
   }
@@ -134,6 +137,7 @@ class EkgDisplayFilter {
   void reset() {
     _highPass.reset();
     _notch50.reset();
+    _notch50Again.reset();
     _notch100?.reset();
     _lowPass.reset();
     _primed = false;

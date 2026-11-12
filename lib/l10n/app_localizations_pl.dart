@@ -299,7 +299,7 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get qualityNoBeats =>
-      'Nie widać uderzeń serca – sprawdź ułożenie elektrod';
+      'Brak wyraźnych uderzeń serca – sprawdź elektrody';
 
   @override
   String get qualityFlat => 'Brak sygnału – odpięta elektroda lub kabel?';
@@ -312,6 +312,9 @@ class AppLocalizationsPl extends AppLocalizations {
   String viewAverageBpm(String value) {
     return 'średnio $value bpm';
   }
+
+  @override
+  String get chartZoomAuto => 'Auto';
 
   @override
   String chartScale(String seconds, String millivolts) {

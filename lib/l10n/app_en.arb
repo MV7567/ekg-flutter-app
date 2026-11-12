@@ -106,11 +106,12 @@
   "qualityChecking": "Checking the signal…",
   "qualityGood": "Good signal",
   "qualityNoisy": "Noisy signal – sit still, relax your muscles, press the electrodes",
-  "qualityNoBeats": "No heart beats visible – check where the electrodes are",
+  "qualityNoBeats": "No clear heart beats – check the electrodes",
   "qualityFlat": "No signal – is an electrode or cable disconnected?",
   "qualityElectrodeOff": "Signal out of range – an electrode is off or loose",
   "viewAverageBpm": "average {value} bpm",
   "@viewAverageBpm": {"description": "Average heart rate of the whole recording", "placeholders": {"value": {"type": "String", "example": "72"}}},
+  "chartZoomAuto": "Auto",
   "chartScale": "1 square: {seconds} s × {millivolts} mV",
   "@chartScale": {"description": "Scale of the EKG paper, top left of the chart", "placeholders": {
     "seconds": {"type": "String", "example": "0.2"}, "millivolts": {"type": "String", "example": "0.25"}

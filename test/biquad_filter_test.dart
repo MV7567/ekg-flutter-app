@@ -39,6 +39,16 @@ void main() {
     expect(outputAmplitude(EkgDisplayFilter(fs).process, 15), greaterThan(0.75));  // QRS
   });
 
+  test('EKG display filter: mains slightly off 50 Hz is removed too (two notches)', () {
+    // real recording 17:34: 3.2 mV hum at 49.9 Hz left 0.033 mV of ripple with one notch,
+    // that made the signal look "noisy"; mains may be 49.8 - 50.2 Hz
+    for (double hz in [49.8, 49.9, 50.0, 50.1, 50.2]) {
+      // 1 here = 1 mV of hum in, under 0.003 -> a 3 mV hum leaves under 0.01 mV
+      expect(outputAmplitude(EkgDisplayFilter(fs).process, hz), lessThan(0.003), reason: '$hz Hz');
+    }
+    expect(outputAmplitude(EkgDisplayFilter(fs).process, 30), greaterThan(0.6));   // the fast part of the QRS
+  });
+
   test('high-pass 0.5 Hz removes offset and slow drift', () {
     expect(outputAmplitude(BiquadFilter.highPass(frequencyHz: 0.5, sampleRateHz: fs).process, 0.05),
         lessThan(0.05));

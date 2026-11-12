@@ -298,8 +298,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Noisy signal – sit still, relax your muscles, press the electrodes';
 
   @override
-  String get qualityNoBeats =>
-      'No heart beats visible – check where the electrodes are';
+  String get qualityNoBeats => 'No clear heart beats – check the electrodes';
 
   @override
   String get qualityFlat =>
@@ -313,6 +312,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String viewAverageBpm(String value) {
     return 'average $value bpm';
   }
+
+  @override
+  String get chartZoomAuto => 'Auto';
 
   @override
   String chartScale(String seconds, String millivolts) {

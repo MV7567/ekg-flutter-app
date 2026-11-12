@@ -8,6 +8,7 @@ import '../heart_rate_detector.dart';        // average bpm, bpm in the window
 import '../recording/recording_file.dart';
 import '../widgets/ekg_chart.dart';
 import '../widgets/fullscreen_chart.dart';
+import '../widgets/zoom_selector.dart';
 import '../widgets/heart_rate_text.dart';
 import 'recording_actions.dart';             // share, delete
 import 'recordings_screen.dart';             // formatStart, formatDuration
@@ -30,7 +31,7 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
   Float32List? _samples;     // null while loading
   Object? _error;
   int _windowStart = 0;      // sample number of the left edge of the chart
-  double _mvPerBigSquare = 0.25;
+  double _mvPerBigSquare = EkgChart.autoZoom;   // Auto: the QRS of every person fills the chart
 
   // heart beats of the whole recording, found once while loading
   Int32List _beats = Int32List(0);   // sample numbers of the R waves
@@ -192,16 +193,9 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
               onChanged: (value) => _showWindow(value.round()),
             ),
           const SizedBox(height: 8),
-          SegmentedButton<double>(   // the same zoom as on the device screen
-            segments: const [
-              ButtonSegment(value: 0.5, label: Text('×1')),
-              ButtonSegment(value: 0.25, label: Text('×2')),
-              ButtonSegment(value: 0.125, label: Text('×4')),
-            ],
-            selected: {_mvPerBigSquare},
-            showSelectedIcon: false,
-            onSelectionChanged: (selection) =>
-                setState(() => _mvPerBigSquare = selection.first),
+          ZoomSelector(   // Auto ×1 ×2 ×4 ×8, the same on every screen
+            value: _mvPerBigSquare,
+            onChanged: (mv) => setState(() => _mvPerBigSquare = mv),
           ),
         ],
       ),

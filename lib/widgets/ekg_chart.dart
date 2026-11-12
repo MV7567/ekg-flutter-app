@@ -1,12 +1,15 @@
 import 'package:flutter/foundation.dart';   // ValueListenable
 import 'package:flutter/material.dart';
+import '../ekg_auto_scale.dart';
 import '../ekg_buffer.dart';
 import '../l10n/app_localizations.dart';
 
 // widget that shows the samples from an EkgBuffer as a line on EKG paper
 // time:      1 big square = 0.2 s, 1 small square = 0.04 s (like paper at 25 mm/s)
-// amplitude: 1 big square = mvPerBigSquare (0.5 mV on standard paper at 10 mm/mV)
-class EkgChart extends StatelessWidget {
+// amplitude: 1 big square = mvPerBigSquare (0.5 mV on standard paper at 10 mm/mV),
+//            or EkgChart.autoZoom: the chart picks the step itself (see EkgAutoScale)
+// stateful: Auto has to remember its last step between the repaints, otherwise it would jump
+class EkgChart extends StatefulWidget {
   const EkgChart({
     super.key,
     required this.buffer,
@@ -23,15 +26,18 @@ class EkgChart extends StatelessWidget {
   // a small red triangle is drawn under each one; null = no markers (live chart)
   final ValueListenable<List<int>>? beatMarkers;
 
+  // the mvPerBigSquare value that means "Auto" (a real scale is never 0)
+  static const double autoZoom = 0;
+
   // text in the top left corner, e.g. "1 square: 0.2 s × 0.125 mV"
   // static and public, so it can be tested without drawing anything
   // t = texts in the chosen language ("1 square" / "1 kratka"), the numbers are formatted here
   static String scaleLabel(AppLocalizations t, double secondsPerSquare, double mvPerSquare) =>
       t.chartScale(_trimmed(secondsPerSquare), _trimmed(mvPerSquare));
 
-  // 3 decimal places without the zeros at the end: 0.500 -> 0.5, 0.250 -> 0.25, 0.125 -> 0.125
+  // 4 decimal places without the zeros at the end: 0.5000 -> 0.5, 0.1250 -> 0.125, 0.0625 -> 0.0625 (×8)
   static String _trimmed(double value) {
-    String text = value.toStringAsFixed(3);
+    String text = value.toStringAsFixed(4);
     while (text.endsWith('0')) {
       text = text.substring(0, text.length - 1);   // remove the last character
     }
@@ -40,14 +46,24 @@ class EkgChart extends StatelessWidget {
   }
 
   @override
+  State<EkgChart> createState() => _EkgChartState();
+}
+
+class _EkgChartState extends State<EkgChart> {
+  // lives as long as the chart, keeps the last Auto step
+  final EkgAutoScale _autoScale = EkgAutoScale();
+
+  @override
   Widget build(BuildContext context) {
     // CustomPaint gives us a canvas, the drawing itself is done by _EkgPainter
-    // the painter has no context, so the translated label is made here and passed in
-    String label = scaleLabel(AppLocalizations.of(context), _EkgPainter.secondsPerBigSquare, mvPerBigSquare);
+    // the painter has no context, so the texts of the chosen language are taken here and passed in
+    // (the scale label itself is made in paint: with Auto only the painter knows the step)
+    AppLocalizations t = AppLocalizations.of(context);
     // the same for the colors: pink paper in the light theme, a dark monitor in the dark one
     EkgChartColors colors = EkgChartColors.of(context);
     return CustomPaint(
-      painter: _EkgPainter(buffer, sampleRateHz, mvPerBigSquare, label, beatMarkers, colors),
+      painter: _EkgPainter(widget.buffer, widget.sampleRateHz, widget.mvPerBigSquare, t, widget.beatMarkers,
+          colors, _autoScale),
       size: Size.infinite,   // take all the space the parent gives
     );
   }
@@ -60,7 +76,8 @@ class _EkgPainter extends CustomPainter {
   // we use this because the pre made widget arent enough
   // size.infite means take up all the space from the parent
   // Listenable.merge: repaint when the buffer OR the markers change
-  _EkgPainter(this.buffer, this.sampleRateHz, this.mvPerBigSquare, this.label, this.beatMarkers, this.colors)
+  _EkgPainter(this.buffer, this.sampleRateHz, this.mvPerBigSquare, this.texts, this.beatMarkers, this.colors,
+      this.autoScale)
       : super(repaint: Listenable.merge([buffer, beatMarkers]));
   // gives the buffer to the constructor, and the painter listens to it (repaint: buffer), so with every notifyListeners() the painter is called and the chart is redrawn
 
@@ -69,10 +86,11 @@ class _EkgPainter extends CustomPainter {
   
   final EkgBuffer buffer;
   final int sampleRateHz;
-  final double mvPerBigSquare;
-  final String label;   // scale text in the top left corner, already translated
+  final double mvPerBigSquare;   // EkgChart.autoZoom = Auto
+  final AppLocalizations texts;   // for the scale text in the top left corner
   final ValueListenable<List<int>>? beatMarkers;
   final EkgChartColors colors;   // paper or monitor
+  final EkgAutoScale autoScale;  // remembers the Auto step, owned by the chart widget
 
   static const double secondsPerBigSquare = 0.2;  // 1 big square = 0.2 s, 1 small square = 0.04 s (like paper at 25 mm/s)
 
@@ -92,7 +110,12 @@ class _EkgPainter extends CustomPainter {
     double secondsOnScreen = buffer.capacity / sampleRateHz;    // 1250 / 250 = 5 s
     double pxPerSecond = size.width / secondsOnScreen;          // eg 328 / 5 = 65.6 px/s
     double bigSquarePx = pxPerSecond * secondsPerBigSquare;     // 65.6 * 0.2 = 13.12 px per big square
-    double pxPerMv = bigSquarePx / mvPerBigSquare;              // with x2: 13,1 / 0,25 = 52,5 px/mV
+    // Auto: the step is chosen from the samples and from how many squares fit above the 0 mV line
+    bool auto = mvPerBigSquare == EkgChart.autoZoom;
+    double scale = auto
+        ? autoScale.update(buffer, sampleRateHz, size.height / 2 / bigSquarePx)
+        : mvPerBigSquare;
+    double pxPerMv = bigSquarePx / scale;              // with x2: 13,1 / 0,25 = 52,5 px/mV
     double zeroY = size.height / 2;                             // 100 px = middle
     // 0 mV in the middle (the high-pass keeps the line around 0)
 
@@ -130,7 +153,8 @@ class _EkgPainter extends CustomPainter {
     // cascade with 3 setters, the line is black, 1.5 px wide, and only the line is drawn, not a filled shape
 
     _drawBeatMarkers(canvas, size, pxPerSecond / sampleRateHz);
-    _drawLabel(canvas);
+    String label = EkgChart.scaleLabel(texts, secondsPerBigSquare, scale);
+    _drawLabel(canvas, auto ? '$label · ${texts.chartZoomAuto}' : label);
   }
 
   // a small red triangle at the bottom edge under every R wave, pointing up at it
@@ -183,10 +207,10 @@ class _EkgPainter extends CustomPainter {
   }
 
   // what one big square means, in the top left corner
-  void _drawLabel(Canvas canvas) {
+  void _drawLabel(Canvas canvas, String text) {
     TextPainter label = TextPainter(
       text: TextSpan(
-        text: this.label,   // the field: the TextPainter made on this line is also called label
+        text: text,
         style: TextStyle(color: colors.label, fontSize: 11),
       ),
       textDirection: TextDirection.ltr,
@@ -204,7 +228,7 @@ class _EkgPainter extends CustomPainter {
       oldDelegate.buffer != buffer ||
       oldDelegate.sampleRateHz != sampleRateHz ||
       oldDelegate.mvPerBigSquare != mvPerBigSquare ||
-      oldDelegate.label != label ||   // e.g. the language was changed
+      oldDelegate.texts != texts ||   // e.g. the language was changed
       oldDelegate.beatMarkers != beatMarkers ||
       oldDelegate.colors != colors;   // light <-> dark theme
 } // with every build() a new _EkgPainter is created, flutter asks if the new painter is goin gtoi draw something different than the previous one, if not then its skispped

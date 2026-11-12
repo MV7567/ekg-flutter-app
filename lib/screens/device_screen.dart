@@ -1,6 +1,7 @@
 import 'dart:async';                                        // timer, stream subscription
 import 'package:flutter/material.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';  // UUID, packetLenght, sampleRateHz
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';          // screen stays on while recording  // UUID, packetLenght, sampleRateHz
 import '../ekg_config.dart';                                // bytes -> samples
 import '../ekg_buffer.dart';                                // saving to CSV
 import '../ekg_packet_decoder.dart';                        // chart filters
@@ -9,9 +10,11 @@ import '../heart_rate_detector.dart';                       // bpm
 import '../signal_quality.dart';                            // good signal / electrode off
 import '../ekg_test_signal.dart';                           // fake ESP32 (debug)
 import '../recording/csv_recorder.dart';                    // drawing the chart
+import '../filters/spike_remover.dart';   // a single broken -100 mV sample never reaches the filters
 import '../filters/biquad_filter.dart';                     
 import '../widgets/ekg_chart.dart';
 import '../widgets/fullscreen_chart.dart';
+import '../widgets/zoom_selector.dart';
 import '../widgets/heart_rate_text.dart';
 import '../widgets/signal_quality_text.dart';
 import '../settings/app_settings.dart';                     // recording length
@@ -84,6 +87,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
   // filters for the chart only (0.5 Hz high-pass, 50 Hz + 100 Hz notch, 40 Hz low-pass),
   // the CSV file keeps the raw values, so they can be filtered differently later
   final EkgDisplayFilter _displayFilter = EkgDisplayFilter(sampleRateHz.toDouble());
+  // before the filters: replaces one impossible sample (a frame broken in the device), see SpikeRemover
+  final SpikeRemover _spikeRemover = SpikeRemover();
 
   // heart rate from the R waves of the filtered signal (see HeartRateDetector)
   // ValueNotifier: the bpm text redraws by itself when the value changes, without setState
@@ -100,7 +105,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
   // chart amplitude scale: how many mV one big square means
   // 0.5 = standard EKG paper (10 mm/mV), smaller value = bigger line
-  double _mvPerBigSquare = 0.25;
+  double _mvPerBigSquare = EkgChart.autoZoom;   // Auto: the QRS of every person fills the chart
   // scale form the switch x1/x2/x4
 
   // timed recording: number of samples after which the recording stops, null = manual (until STOP)
@@ -288,11 +293,15 @@ class _DeviceScreenState extends State<DeviceScreen> {
     _decoder.reset();
     _chartBuffer.clear();   // the chart starts empty for every recording
     _displayFilter.reset(); // and the filters forget the previous recording
+    _spikeRemover.reset();
     _heartRate.reset();     // and the beat detector too
     _bpm.value = null;
     _qualityMonitor.reset();
     _quality.value = SignalQuality.checking;
     _isRecording = true;   // set before the command, so the first packet is not ignored
+    // the screen doesn't go dark during the recording, otherwise the person reaches for the phone
+    // and moves the electrodes / cables (= artifacts), every end of a recording turns it back off
+    _setKeepScreenOn(true);
     // readying new recording:
     // - packet counters
     // - empty chart
@@ -349,10 +358,17 @@ class _DeviceScreenState extends State<DeviceScreen> {
   }
   
 
+  // the screen stays on (true) or may turn off by itself again (false),
+  // a failure (e.g. a phone without this feature) only costs the feature, the recording goes on
+  void _setKeepScreenOn(bool on) {
+    WakelockPlus.toggle(enable: on).catchError((e) => debugPrint("Wakelock error: $e"));
+  }
+
   // stops writing and closes the file, packets arriving after this are ignored
   // returns false if the file could not be written completely
   Future<bool> _finishRecording() async {
     _isRecording = false;
+    _setKeepScreenOn(false);   // the phone may go dark again as usual
     _uiTimer?.cancel();
     _uiTimer = null;
 
@@ -394,7 +410,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
       if (_sampleLimit != null && packet.firstSampleIndex + i >= _sampleLimit!) break;
       int rawValue = packet.rawValues[i];
       _recorder.writeSample(packet.firstSampleIndex + i, rawValue);   // raw value to the file
-      double millivolts = rawValue * millivoltsPerLsb;
+      // the file got the raw value above, from here on a broken single sample is replaced
+      double millivolts = _spikeRemover.process(rawValue * millivoltsPerLsb);
       double filtered = _displayFilter.process(millivolts);
       packetMillivolts.add(filtered);   // filtered value for the chart
       // and for the beat detector, true = this sample finished a beat
@@ -416,7 +433,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
     // signal quality, needs to know how long ago the last beat was
     int? lastBeat = _heartRate.lastBeat;
     int lastSample = packet.firstSampleIndex + packet.rawValues.length - 1;
-    _quality.value = _qualityMonitor.update(lastBeat == null ? null : lastSample - lastBeat);
+    _quality.value = _qualityMonitor.update(lastBeat == null ? null : lastSample - lastBeat,
+        rhythmSteady: _heartRate.rhythmSteady);
 
     // the chosen length is reached -> stop like the STOP button,
     // !_isBusy: the next packets arrive while stopping, stop only once
@@ -500,6 +518,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
     _connectionSubscription?.cancel();
     // 2. Close the file (leaving the screen during a recording), not awaited, dispose can't wait
     _isRecording = false;
+    _setKeepScreenOn(false);
     _recorder.close();
     // 3. Disconnect the device (the ESP32 stops the measurement when the phone disconnects)
     // catchError: an error here (e.g. already disconnected) is only printed, not "Unhandled exception"
@@ -581,16 +600,9 @@ class _DeviceScreenState extends State<DeviceScreen> {
                   const SizedBox(height: 8),  // empty sized box as an element separator 
 
                   // amplitude zoom, like the 5/10/20 mm/mV switch on EKG machines
-                  SegmentedButton<double>(
-                    segments: const [
-                      ButtonSegment(value: 0.5, label: Text('×1')),
-                      ButtonSegment(value: 0.25, label: Text('×2')),
-                      ButtonSegment(value: 0.125, label: Text('×4')),
-                    ],
-                    selected: {_mvPerBigSquare},
-                    showSelectedIcon: false,
-                    onSelectionChanged: (selection) =>
-                        setState(() => _mvPerBigSquare = selection.first),
+                  ZoomSelector(   // Auto ×1 ×2 ×4 ×8, the same on every screen
+                    value: _mvPerBigSquare,
+                    onChanged: (mv) => setState(() => _mvPerBigSquare = mv),
                   ),
                   // Scale switch:
                   // every segment is a double

@@ -5,7 +5,7 @@ enum SignalQuality {
   checking,       // the first 2 s, not enough data yet
   good,           // clean signal with regular beats
   noisy,          // a lot of fast wiggling: muscles, moving, a loose electrode
-  noBeats,        // a signal, but no heart beat for 3 s: electrodes in a wrong place?
+  noBeats,        // a signal, but no heart beat for 3 s, or "beats" at random intervals (loose inputs)
   flat,           // almost a straight line: nothing is connected
   electrodeOff,   // the raw signal is huge or at the edge of the ADC range: an electrode is off
 }
@@ -40,6 +40,8 @@ class SignalQualityMonitor {
   static const double _minPeakToPeak = 0.05;    // under that the filtered signal is a straight line
   static const double _maxTypicalSlope = 0.03;  // typical step between samples, a clean EKG is mostly flat between the beats
   static const double _noBeatSeconds = 3;       // the same timeout as the heart rate
+  // a steady rhythm needs 4 beats + the detector learns 2.5 s, until then "checking", not a warning
+  static const double _rhythmGraceSeconds = 8;
 
   // one sample: raw = mV before the filter, filtered = after it, the same as for the chart
   void addSample(double raw, double filtered) {
@@ -54,16 +56,17 @@ class SignalQualityMonitor {
 
   // checks the last 2 s, called after every packet
   // samplesSinceLastBeat: from the heart rate detector, null = no beat found yet
+  // rhythmSteady: from the detector, the beats come at regular intervals (see rhythmSteady there)
   // the check is done only every 0.5 s, so the text doesn't flicker 25 times per second
-  SignalQuality update(int? samplesSinceLastBeat) {
+  SignalQuality update(int? samplesSinceLastBeat, {bool rhythmSteady = true}) {
     if (_seen < _raw.length) return _quality = SignalQuality.checking;
     if (_quality != SignalQuality.checking && _sinceCheck < sampleRateHz ~/ 2) return _quality;   // checked less than 0.5 s ago
     _sinceCheck = 0;
-    _quality = _check(samplesSinceLastBeat);
+    _quality = _check(samplesSinceLastBeat, rhythmSteady);
     return _quality;
   }
 
-  SignalQuality _check(int? samplesSinceLastBeat) {
+  SignalQuality _check(int? samplesSinceLastBeat, bool rhythmSteady) {
     // 1. raw signal at the edge of the ADC or swinging wildly: an electrode is off
     double rawMin = _raw[0], rawMax = _raw[0];
     for (double x in _raw) {
@@ -89,9 +92,20 @@ class SignalQualityMonitor {
     // 4. no beat for 3 s, and the signal itself looks fine
     // no beat yet at all: counted from the start of the recording, so the first seconds
     // (the detector is still learning) are not reported as a problem
+    // (the detector settles 0.5 s + learns 2 s, so the first beat can come only after ~3 s:
+    //  without any beat yet it is "checking" until the grace time, not a warning)
+    if (samplesSinceLastBeat == null && _seen < _rhythmGraceSeconds * sampleRateHz) {
+      return SignalQuality.checking;
+    }
     int since = samplesSinceLastBeat ?? _seen;
     if (since > _noBeatSeconds * sampleRateHz) {
       return SignalQuality.noBeats;
+    }
+
+    // 5. "beats" at random intervals: noise from loose inputs, not a heart
+    //    (a recording without electrodes looked "good" before this check)
+    if (!rhythmSteady) {
+      return _seen < _rhythmGraceSeconds * sampleRateHz ? SignalQuality.checking : SignalQuality.noBeats;
     }
     return SignalQuality.good;
   }
