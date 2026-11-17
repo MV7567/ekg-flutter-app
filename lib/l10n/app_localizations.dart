@@ -122,6 +122,66 @@ abstract class AppLocalizations {
   /// **'Delete'**
   String get commonDelete;
 
+  /// No description provided for @commonSave.
+  ///
+  /// In en, this message translates to:
+  /// **'SAVE'**
+  String get commonSave;
+
+  /// No description provided for @noteEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Note'**
+  String get noteEdit;
+
+  /// No description provided for @noteDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Note of the recording'**
+  String get noteDialogTitle;
+
+  /// No description provided for @noteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. rest, after running'**
+  String get noteHint;
+
+  /// No description provided for @noteSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save the note: {error}'**
+  String noteSaveError(String error);
+
+  /// No description provided for @deviceNoteLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Note (optional)'**
+  String get deviceNoteLabel;
+
+  /// No description provided for @deviceEvent.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark event'**
+  String get deviceEvent;
+
+  /// No description provided for @deviceEventCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark event ({count})'**
+  String deviceEventCount(int count);
+
+  /// No description provided for @deviceEventSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Event marked at {time}'**
+  String deviceEventSaved(String time);
+
+  /// No description provided for @viewEvents.
+  ///
+  /// In en, this message translates to:
+  /// **'Events:'**
+  String get viewEvents;
+
   /// No description provided for @appTitle.
   ///
   /// In en, this message translates to:
@@ -229,6 +289,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Off: pink paper (light) / green monitor (dark)'**
   String get settingsChartMatchesPaletteHint;
+
+  /// No description provided for @settingsSound.
+  ///
+  /// In en, this message translates to:
+  /// **'Sound'**
+  String get settingsSound;
+
+  /// No description provided for @settingsBeepOnBeat.
+  ///
+  /// In en, this message translates to:
+  /// **'Beep on every heart beat'**
+  String get settingsBeepOnBeat;
+
+  /// No description provided for @settingsBeepOnBeatHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Like a hospital monitor, the volume buttons (media) change the loudness'**
+  String get settingsBeepOnBeatHint;
 
   /// No description provided for @paletteRed.
   ///
@@ -470,6 +548,30 @@ abstract class AppLocalizations {
   /// **'Lost packets: {count}'**
   String deviceLostPackets(int count);
 
+  /// No description provided for @deviceSignalStrength.
+  ///
+  /// In en, this message translates to:
+  /// **'BLE signal: {rssi} dBm ({level})'**
+  String deviceSignalStrength(int rssi, String level);
+
+  /// No description provided for @signalStrong.
+  ///
+  /// In en, this message translates to:
+  /// **'strong'**
+  String get signalStrong;
+
+  /// No description provided for @signalFair.
+  ///
+  /// In en, this message translates to:
+  /// **'fair'**
+  String get signalFair;
+
+  /// No description provided for @signalWeak.
+  ///
+  /// In en, this message translates to:
+  /// **'weak – move the phone closer'**
+  String get signalWeak;
+
   /// No description provided for @deviceRejectedPackets.
   ///
   /// In en, this message translates to:
@@ -523,6 +625,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The recording has no samples.'**
   String get viewNoSamples;
+
+  /// No description provided for @statsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording statistics'**
+  String get statsTitle;
+
+  /// No description provided for @reportButton.
+  ///
+  /// In en, this message translates to:
+  /// **'PDF report'**
+  String get reportButton;
+
+  /// No description provided for @reportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'EKG report'**
+  String get reportTitle;
+
+  /// No description provided for @reportStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get reportStart;
+
+  /// No description provided for @reportLength.
+  ///
+  /// In en, this message translates to:
+  /// **'Length'**
+  String get reportLength;
+
+  /// No description provided for @reportDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Device'**
+  String get reportDevice;
+
+  /// No description provided for @reportNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Note'**
+  String get reportNote;
+
+  /// No description provided for @reportEkg.
+  ///
+  /// In en, this message translates to:
+  /// **'EKG ({speed} mm/s, {gain} mm/mV, filtered 0.5–40 Hz)'**
+  String reportEkg(int speed, int gain);
+
+  /// No description provided for @reportFirstSeconds.
+  ///
+  /// In en, this message translates to:
+  /// **'The first {seconds} s of the recording.'**
+  String reportFirstSeconds(int seconds);
+
+  /// No description provided for @reportDisclaimer.
+  ///
+  /// In en, this message translates to:
+  /// **'Made with a student project, not a medical device – not for diagnosis.'**
+  String get reportDisclaimer;
+
+  /// No description provided for @reportError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not create the report: {error}'**
+  String reportError(String error);
+
+  /// No description provided for @statsNotEnoughBeats.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough heart beats for statistics.'**
+  String get statsNotEnoughBeats;
+
+  /// No description provided for @statsMin.
+  ///
+  /// In en, this message translates to:
+  /// **'Min'**
+  String get statsMin;
+
+  /// No description provided for @statsAverage.
+  ///
+  /// In en, this message translates to:
+  /// **'Average'**
+  String get statsAverage;
+
+  /// No description provided for @statsMax.
+  ///
+  /// In en, this message translates to:
+  /// **'Max'**
+  String get statsMax;
+
+  /// No description provided for @statsBeats.
+  ///
+  /// In en, this message translates to:
+  /// **'{beats} beats, {excluded} intervals left out (missed beats, artifacts)'**
+  String statsBeats(int beats, int excluded);
+
+  /// No description provided for @statsTachogram.
+  ///
+  /// In en, this message translates to:
+  /// **'RR intervals over time (tachogram)'**
+  String get statsTachogram;
+
+  /// No description provided for @statsHrvHint.
+  ///
+  /// In en, this message translates to:
+  /// **'HRV (SDNN, RMSSD) is reliable only for a calm recording of at least 1 minute without moving.'**
+  String get statsHrvHint;
 
   /// E-mail subject when a recording is shared
   ///

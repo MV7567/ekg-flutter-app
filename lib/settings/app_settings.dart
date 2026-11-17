@@ -19,6 +19,7 @@ class AppSettings extends ChangeNotifier {    // extends ChangeNotifier, works l
   static const String _languageKey = 'language';
   static const String _paletteKey = 'palette';
   static const String _chartMatchesPaletteKey = 'chartMatchesPalette';
+  static const String _beepOnBeatKey = 'beepOnBeat';
 
   final SharedPreferencesAsync _prefs = SharedPreferencesAsync();
 
@@ -32,6 +33,10 @@ class AppSettings extends ChangeNotifier {    // extends ChangeNotifier, works l
   // false = the classic chart (pink paper / green monitor), true = in the palette colors
   bool _chartMatchesPalette = false;
   bool get chartMatchesPalette => _chartMatchesPalette;
+
+  // true = a short beep on every heart beat during a recording, off by default (it can be annoying)
+  bool _beepOnBeat = false;
+  bool get beepOnBeat => _beepOnBeat;
 
   // app language as a code: "en", "pl", ..., "" = like the phone
   String _languageCode = '';
@@ -53,6 +58,7 @@ class AppSettings extends ChangeNotifier {    // extends ChangeNotifier, works l
       _languageCode = parseLanguageCode(await _prefs.getString(_languageKey), supportedLanguageCodes);
       _palette = AppPalette.parse(await _prefs.getString(_paletteKey));
       _chartMatchesPalette = await _prefs.getBool(_chartMatchesPaletteKey) ?? false;   // ?? false: nothing saved yet
+      _beepOnBeat = await _prefs.getBool(_beepOnBeatKey) ?? false;
     } catch (e) {
       // storage not readable -> the defaults stay, the app still starts
       debugPrint("Settings load error: $e");
@@ -87,6 +93,17 @@ class AppSettings extends ChangeNotifier {    // extends ChangeNotifier, works l
     notifyListeners();   // MaterialApp makes the theme again, with the other chart colors
     try {
       await _prefs.setBool(_chartMatchesPaletteKey, value);
+    } catch (e) {
+      debugPrint("Settings save error: $e");
+    }
+  }
+
+  Future<void> setBeepOnBeat(bool value) async {
+    if (value == _beepOnBeat) return;
+    _beepOnBeat = value;
+    notifyListeners();
+    try {
+      await _prefs.setBool(_beepOnBeatKey, value);
     } catch (e) {
       debugPrint("Settings save error: $e");
     }

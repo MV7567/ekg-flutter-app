@@ -20,6 +20,19 @@ class CsvRecorder {
   // so the recordings screen can still read old files if the columns change one day
   static const int formatVersion = 1;
 
+  // the footer: lines at the END of the file, written when the recording is closed
+  // (the average heart rate is known only then)
+  // a note can be changed later by appending a new "# note:" line, the last one counts,
+  // so the 150 000 sample lines never have to be written again
+  // like the header they start with #, every reader of the samples skips them
+  static const String averageBpmTag = '# average bpm:';
+  static const String noteTag = '# note:';
+  static const int maxNoteLength = 80;
+
+  // an event marked with the button during the recording ("cough", "stood up"...):
+  // "# event: 5712" = at sample 5712, written between the samples at the moment of the tap
+  static const String eventTag = '# event:';
+
   static const MethodChannel _mediaScanner = MethodChannel('ecg_ble_app/media_scanner');
   // connection between dart and android native code, the channel name is arbitrary but must match the one in MainActivity.kt
 
@@ -87,6 +100,11 @@ class CsvRecorder {
     _sink?.writeln(csvLine(sampleIndex, rawValue));
   }
 
+  // marks an event at this sample (the newest one received when the button was tapped)
+  void writeEvent(int sampleIndex) {
+    _sink?.writeln('$eventTag $sampleIndex');
+  }
+
   // the text of one line (without the new line), static so it can be tested without a file
   static String csvLine(int sampleIndex, int rawValue) {
     double timeS = sampleIndex / sampleRateHz;
@@ -101,15 +119,43 @@ class CsvRecorder {
   // ?. : if the file is closed (null) the line is skipped without errror 
   // toStringAsFixed always uses a . as the decimal separator regardless of language
 
+  // the note as it is saved: one line (a new line would end the "# note:" line), every run of
+  // spaces / new lines becomes one space, at most 80 characters (the list shows it in one line)
+  static String cleanNote(String note) {
+    String oneLine = note.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return oneLine.length > maxNoteLength ? oneLine.substring(0, maxNoteLength).trim() : oneLine;
+  }
+
+  // the footer lines, static so they can be tested without a file
+  // nothing known -> no line (an old app or a too short recording)
+  static List<String> footerLines({int? averageBpm, String note = ''}) {
+    String cleaned = cleanNote(note);
+    return [
+      if (averageBpm != null) '$averageBpmTag $averageBpm',
+      if (cleaned.isNotEmpty) '$noteTag $cleaned',
+    ];
+  }
+
+  // a new note for a finished recording: one line added at the end, "" removes the note
+  static Future<void> appendNote(String path, String note) async {
+    await File(path).writeAsString('$noteTag ${cleanNote(note)}\n', mode: FileMode.append, flush: true);
+    await updateMediaStore(path);   // the file changed, the PC over USB should see the new size
+  }
+
   // writes the rest of the data, closes the file and makes it visible in the file manager
   // safe to call more than once
   // returns false if writing failed (e.g. phone memory full, file deleted during the recording),
   // then the file may be incomplete
-  Future<bool> close() async {
+  // averageBpm and note go into the footer (see footerLines)
+  Future<bool> close({int? averageBpm, String note = ''}) async {
     IOSink? sink = _sink;
     _sink = null;   // set first, so writeSample() does nothing from now on
     if (sink == null) return true;   // nothing open, nothing could fail
     // take the value and then reset it
+
+    for (String line in footerLines(averageBpm: averageBpm, note: note)) {
+      sink.writeln(line);
+    }
 
     bool ok = true;
     try {

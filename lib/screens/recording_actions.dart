@@ -1,5 +1,13 @@
+import 'dart:io';                               // File
+import 'package:flutter/foundation.dart';      // Float32List
+import 'package:flutter/services.dart';        // rootBundle (the font files)
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';   // temporary folder for the PDF
+import 'package:pdf/widgets.dart' as pw;       // pw.Font
 import 'package:share_plus/share_plus.dart';   // the Android share sheet
+import '../ekg_config.dart';                   // sampleRateHz
+import '../recording/pdf_report.dart';
+import '../rr_stats.dart';
 import '../recording/csv_recorder.dart';       // updateMediaStore
 import '../recording/recording_file.dart';
 import '../l10n/app_localizations.dart';
@@ -21,6 +29,91 @@ Future<void> shareRecording(BuildContext context, RecordingInfo recording) async
     debugPrint("Share error: $e");
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.shareError('$e'))));
+    }
+  }
+}
+
+// a dialog to write or change the note of a recording ("rest", "after running"),
+// saves it in the file, returns the new note, null = cancelled or not saved
+Future<String?> editRecordingNote(BuildContext context, RecordingInfo recording, String currentNote) async {
+  AppLocalizations t = AppLocalizations.of(context);
+  TextEditingController controller = TextEditingController(text: currentNote);
+  String? note = await showDialog<String>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(t.noteDialogTitle),
+      content: TextField(
+        controller: controller,
+        autofocus: true,                                   // the keyboard opens at once
+        maxLength: CsvRecorder.maxNoteLength,              // a counter "12/80" under the field
+        decoration: InputDecoration(hintText: t.noteHint),
+        onSubmitted: (text) => Navigator.of(context).pop(text),   // Enter = save
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(t.commonCancel)),
+        TextButton(onPressed: () => Navigator.of(context).pop(controller.text), child: Text(t.commonSave)),
+      ],
+    ),
+  );
+  controller.dispose();
+  if (note == null) return null;   // cancelled
+  note = CsvRecorder.cleanNote(note);
+  if (note == currentNote) return null;   // nothing changed, nothing to write
+
+  try {
+    await CsvRecorder.appendNote(recording.file.path, note);
+    return note;
+  } catch (e) {
+    debugPrint("Note save error: $e");
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.noteSaveError('$e'))));
+    }
+    return null;
+  }
+}
+
+// makes the PDF report of a loaded recording and opens the share window with it
+// (e-mail, Drive, a printer app, "save to files"...)
+// the PDF goes to the temporary folder: it can be made again any time from the CSV
+Future<void> shareReport(
+  BuildContext context,
+  RecordingInfo recording, {
+  required String note,
+  required Float32List millivolts,
+  required List<int> beats,
+  required List<int> events,
+  required RrStats? stats,
+}) async {
+  AppLocalizations t = AppLocalizations.of(context);
+  try {
+    // the fonts with Polish letters, from the assets (see pubspec.yaml)
+    pw.Font regular = pw.Font.ttf(await rootBundle.load('assets/fonts/Roboto-Regular.ttf'));
+    pw.Font bold = pw.Font.ttf(await rootBundle.load('assets/fonts/Roboto-Bold.ttf'));
+    Uint8List bytes = await PdfReport.build(
+      t: t,
+      regular: regular,
+      bold: bold,
+      start: recording.start,
+      deviceName: recording.deviceName,
+      note: note,
+      millivolts: millivolts,
+      beats: beats,
+      events: events,
+      stats: stats,
+      sampleRateHz: sampleRateHz,
+    );
+    // ekg_2026-11-12_16-25-25.csv -> ekg_2026-11-12_16-25-25_report.pdf
+    String name = recording.fileName.replaceAll(RegExp(r'\.csv$'), '_report.pdf');
+    File file = File('${(await getTemporaryDirectory()).path}/$name');
+    await file.writeAsBytes(bytes, flush: true);
+    await SharePlus.instance.share(ShareParams(
+      files: [XFile(file.path, mimeType: 'application/pdf')],
+      subject: t.shareSubject(RecordingsScreen.formatStart(recording.start, t)),
+    ));
+  } catch (e) {
+    debugPrint("Report error: $e");
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.reportError('$e'))));
     }
   }
 }

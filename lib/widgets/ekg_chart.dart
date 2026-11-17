@@ -16,6 +16,7 @@ class EkgChart extends StatefulWidget {
     required this.sampleRateHz,
     this.mvPerBigSquare = 0.5,  // not required bc it has a default value
     this.beatMarkers,
+    this.eventMarkers,
   });
 
 // final: cannot be changed after the constructor, required: must be given when creating the widget
@@ -25,6 +26,12 @@ class EkgChart extends StatefulWidget {
   // optional: where the R waves are, as positions in the buffer (0 = oldest sample),
   // a small red triangle is drawn under each one; null = no markers (live chart)
   final ValueListenable<List<int>>? beatMarkers;
+  // optional: marked events (the event button), positions in the buffer like beatMarkers,
+  // a blue vertical line with a small flag at the top
+  final ValueListenable<List<int>>? eventMarkers;
+
+  // blue: different from the red beat triangles, also used by the event button and the chips
+  static const Color eventColor = Color(0xFF1E88E5);
 
   // the mvPerBigSquare value that means "Auto" (a real scale is never 0)
   static const double autoZoom = 0;
@@ -63,7 +70,7 @@ class _EkgChartState extends State<EkgChart> {
     EkgChartColors colors = EkgChartColors.of(context);
     return CustomPaint(
       painter: _EkgPainter(widget.buffer, widget.sampleRateHz, widget.mvPerBigSquare, t, widget.beatMarkers,
-          colors, _autoScale),
+          colors, _autoScale, widget.eventMarkers),
       size: Size.infinite,   // take all the space the parent gives
     );
   }
@@ -77,8 +84,8 @@ class _EkgPainter extends CustomPainter {
   // size.infite means take up all the space from the parent
   // Listenable.merge: repaint when the buffer OR the markers change
   _EkgPainter(this.buffer, this.sampleRateHz, this.mvPerBigSquare, this.texts, this.beatMarkers, this.colors,
-      this.autoScale)
-      : super(repaint: Listenable.merge([buffer, beatMarkers]));
+      this.autoScale, this.eventMarkers)
+      : super(repaint: Listenable.merge([buffer, beatMarkers, eventMarkers]));
   // gives the buffer to the constructor, and the painter listens to it (repaint: buffer), so with every notifyListeners() the painter is called and the chart is redrawn
 
   // BLE packet -> _processEkgData -> _chartBuffer.addAll -> notifyListeners() -> repaint: buffer -> _EkgPainter.paint
@@ -91,6 +98,7 @@ class _EkgPainter extends CustomPainter {
   final ValueListenable<List<int>>? beatMarkers;
   final EkgChartColors colors;   // paper or monitor
   final EkgAutoScale autoScale;  // remembers the Auto step, owned by the chart widget
+  final ValueListenable<List<int>>? eventMarkers;
 
   static const double secondsPerBigSquare = 0.2;  // 1 big square = 0.2 s, 1 small square = 0.04 s (like paper at 25 mm/s)
 
@@ -153,11 +161,32 @@ class _EkgPainter extends CustomPainter {
     // cascade with 3 setters, the line is black, 1.5 px wide, and only the line is drawn, not a filled shape
 
     _drawBeatMarkers(canvas, size, pxPerSecond / sampleRateHz);
+    _drawEventMarkers(canvas, size, pxPerSecond / sampleRateHz);
     String label = EkgChart.scaleLabel(texts, secondsPerBigSquare, scale);
     _drawLabel(canvas, auto ? '$label · ${texts.chartZoomAuto}' : label);
   }
 
   // a small red triangle at the bottom edge under every R wave, pointing up at it
+  // a blue vertical line over the whole height + a small flag at the top for every event
+  void _drawEventMarkers(Canvas canvas, Size size, double xStep) {
+    List<int>? markers = eventMarkers?.value;
+    if (markers == null || markers.isEmpty) return;
+    Paint line = Paint()
+      ..color = EkgChart.eventColor
+      ..strokeWidth = 2;
+    Paint flag = Paint()..color = EkgChart.eventColor;
+    for (int position in markers) {
+      double x = position * xStep;
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), line);
+      Path triangle = Path()
+        ..moveTo(x, 0)
+        ..lineTo(x + 10, 5)
+        ..lineTo(x, 10)
+        ..close();
+      canvas.drawPath(triangle, flag);
+    }
+  }
+
   void _drawBeatMarkers(Canvas canvas, Size size, double xStep) {
     List<int>? markers = beatMarkers?.value;
     if (markers == null || markers.isEmpty) return;
@@ -230,6 +259,7 @@ class _EkgPainter extends CustomPainter {
       oldDelegate.mvPerBigSquare != mvPerBigSquare ||
       oldDelegate.texts != texts ||   // e.g. the language was changed
       oldDelegate.beatMarkers != beatMarkers ||
+      oldDelegate.eventMarkers != eventMarkers ||
       oldDelegate.colors != colors;   // light <-> dark theme
 } // with every build() a new _EkgPainter is created, flutter asks if the new painter is goin gtoi draw something different than the previous one, if not then its skispped
 // new data is taken care of by repaint: buffer, so here e compare only settings, with changing x1/x2/x4 the result is true

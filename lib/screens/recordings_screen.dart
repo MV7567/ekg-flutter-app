@@ -64,6 +64,10 @@ class _RecordingsScreenState extends State<RecordingsScreen> {
   // push returns a Future, which ends with pop, value parsed to pop
   // exiting with the back arrow gives null so the list refreshes only with a normal deletion
 
+  Future<void> _editNote(RecordingInfo r) async {
+    if (await editRecordingNote(context, r, r.note) != null && mounted) _refresh();
+  }
+
   Future<void> _delete(RecordingInfo r) async {
     if (await confirmAndDeleteRecording(context, r) && mounted) _refresh();
   }
@@ -105,16 +109,26 @@ class _RecordingsScreenState extends State<RecordingsScreen> {
                     itemBuilder: (context, index) {
                       RecordingInfo r = recordings[index];
                       String device = r.deviceName.isEmpty ? '' : '  ·  ${r.deviceName}';
+                      String bpm = r.averageBpm == null ? '' : '  ·  ♥ ${r.averageBpm} bpm';   // from the footer
                       return ListTile(
                         leading: const Icon(Icons.monitor_heart),
                         title: Text(RecordingsScreen.formatStart(r.start, t)),
-                        subtitle: Text('${RecordingsScreen.formatDuration(r.duration)}  ·  '
-                            '${RecordingsScreen.formatSize(r.sizeBytes)}$device'),
+                        // the note in its own line above the details, only if there is one
+                        subtitle: Text('${r.note.isEmpty ? '' : '${r.note}\n'}'
+                            '${RecordingsScreen.formatDuration(r.duration)}  ·  '
+                            '${RecordingsScreen.formatSize(r.sizeBytes)}$bpm$device'),
+                        isThreeLine: r.note.isNotEmpty,   // more room for the extra line
                         onTap: () => _open(r),
                         // ⋮ menu on the right
                         trailing: PopupMenuButton<String>(  // each position has value (share/delete)
-                          onSelected: (action) => action == 'share' ? shareRecording(context, r) : _delete(r),   // decides what to do 
+                          onSelected: (action) => switch (action) {   // decides what to do
+                            'share' => shareRecording(context, r),
+                            'note' => _editNote(r),
+                            _ => _delete(r),
+                          },
                           itemBuilder: (context) => [
+                            PopupMenuItem(value: 'note', child: ListTile(
+                                leading: const Icon(Icons.edit_note), title: Text(t.noteEdit))),
                             PopupMenuItem(value: 'share', child: ListTile(  // ListTile so there can be an icon next to text
                                 leading: const Icon(Icons.share), title: Text(t.commonShare))),
                             PopupMenuItem(value: 'delete', child: ListTile(

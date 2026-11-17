@@ -18,6 +18,8 @@ class RecordingInfo {
     required this.formatVersion,
     required this.sizeBytes,
     required this.duration,
+    this.note = '',
+    this.averageBpm,
   });
 
   final File file;
@@ -26,6 +28,8 @@ class RecordingInfo {
   final int formatVersion;     // 0 = old file without "# format:" line
   final int sizeBytes;
   final Duration duration;
+  final String note;           // "" = no note (also all old files)
+  final int? averageBpm;       // from the footer, null = not saved (old files, too few beats)
 
   String get fileName => file.uri.pathSegments.last;
 
@@ -70,10 +74,12 @@ class RecordingInfo {
     RandomAccessFile raf = await file.open();   // Random access file, unlike readAsString doesnt read the whole file, but any position
     try {
       String head = await _readText(raf, 0, 1024);
-      String tail = await _readText(raf, size > 256 ? size - 256 : 0, 256);
+      // 1024: the footer (average bpm, note lines) is after the last sample
+      String tail = await _readText(raf, size > 1024 ? size - 1024 : 0, 1024);
 
       String name = file.uri.pathSegments.last;
       List<String> headLines = const LineSplitter().convert(head);
+      List<String> tailLines = const LineSplitter().convert(tail);
 
       return RecordingInfo(
         file: file,
@@ -81,7 +87,9 @@ class RecordingInfo {
         deviceName: parseDeviceName(headLines),
         formatVersion: parseFormatVersion(headLines),
         sizeBytes: size,
-        duration: durationFromLastLines(const LineSplitter().convert(tail)),
+        duration: durationFromLastLines(tailLines),
+        note: parseNote(tailLines),
+        averageBpm: parseAverageBpm(tailLines),
       );
     } finally {
       await raf.close();   // file always closes, also after an error
@@ -100,7 +108,11 @@ class RecordingInfo {
   // static because an isolate can only start a static or top-level function
   static Float32List loadFilteredMillivolts(String path) {  // reads the whole file, puts it through the same filter as in a live measurement 
     List<String> lines = File(path).readAsLinesSync();   // sync is ok, this is not the UI thread
-    Float32List millivolts = parseMillivolts(lines);
+    return filterMillivolts(parseMillivolts(lines));
+  }
+
+  // the same spike remover + display filter as live, in place (the list is changed and returned)
+  static Float32List filterMillivolts(Float32List millivolts) {
     EkgDisplayFilter filter = EkgDisplayFilter(sampleRateHz.toDouble());
     SpikeRemover spikeRemover = SpikeRemover();
     for (int i = 0; i < millivolts.length; i++) {
@@ -112,9 +124,10 @@ class RecordingInfo {
   // everything the view screen needs, in one trip to the background isolate:
   // the filtered samples and the heart beats found in them
   static RecordingData loadForView(String path) {
-    Float32List millivolts = loadFilteredMillivolts(path);
+    List<String> lines = File(path).readAsLinesSync();
+    Float32List millivolts = filterMillivolts(parseMillivolts(lines));
     List<int> beats = HeartRateDetector.findBeats(millivolts, sampleRateHz);
-    return RecordingData(millivolts, Int32List.fromList(beats));
+    return RecordingData(millivolts, Int32List.fromList(beats), Int32List.fromList(parseEvents(lines)));
   }
 
   // ---- pure functions below: no files, so they can be tested ----
@@ -186,6 +199,36 @@ class RecordingInfo {
     return DateTime.tryParse('${m[1]}T${m[2]}:${m[3]}:${m[4]}');
   }
 
+  // "# event: 5712" lines -> [5712, ...], the samples where the event button was tapped
+  static List<int> parseEvents(List<String> lines) {
+    List<int> events = [];
+    for (String line in lines) {
+      if (!line.startsWith(CsvRecorder.eventTag)) continue;
+      int? sample = int.tryParse(line.substring(CsvRecorder.eventTag.length).trim());
+      if (sample != null) events.add(sample);
+    }
+    return events;
+  }
+
+  // the LAST "# note:" line of the end of the file (a changed note is appended), "" = no note
+  static String parseNote(List<String> tailLines) {
+    String note = '';
+    for (String line in tailLines) {
+      if (line.startsWith(CsvRecorder.noteTag)) note = line.substring(CsvRecorder.noteTag.length).trim();
+    }
+    return note;
+  }
+
+  // "# average bpm: 78" -> 78, no such line -> null
+  static int? parseAverageBpm(List<String> tailLines) {
+    for (String line in tailLines) {
+      if (line.startsWith(CsvRecorder.averageBpmTag)) {
+        return int.tryParse(line.substring(CsvRecorder.averageBpmTag.length).trim());
+      }
+    }
+    return null;
+  }
+
   // the first column of the last complete data line is the sample number,
   // sample numbers include the lost packets, so this is the real length of the recording
   static Duration durationFromLastLines(List<String> tailLines) {
@@ -206,8 +249,9 @@ class RecordingInfo {
 // a loaded recording for the view screen
 // a plain class with typed lists, so compute() can send it back from the background isolate
 class RecordingData {
-  RecordingData(this.millivolts, this.beats);
+  RecordingData(this.millivolts, this.beats, [Int32List? events]) : events = events ?? Int32List(0);
 
   final Float32List millivolts;   // filtered samples, index = sample number
   final Int32List beats;          // sample numbers of the R waves, in order
+  final Int32List events;         // sample numbers of the marked events, in order
 }

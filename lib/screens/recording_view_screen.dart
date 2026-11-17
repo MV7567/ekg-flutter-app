@@ -6,10 +6,12 @@ import '../ekg_buffer.dart';
 import '../ekg_config.dart';
 import '../heart_rate_detector.dart';        // average bpm, bpm in the window
 import '../recording/recording_file.dart';
+import '../rr_stats.dart';                   // min / max bpm, HRV, tachogram
 import '../widgets/ekg_chart.dart';
 import '../widgets/fullscreen_chart.dart';
 import '../widgets/zoom_selector.dart';
 import '../widgets/heart_rate_text.dart';
+import '../widgets/recording_stats_card.dart';
 import 'recording_actions.dart';             // share, delete
 import 'recordings_screen.dart';             // formatStart, formatDuration
 
@@ -36,9 +38,17 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
   // heart beats of the whole recording, found once while loading
   Int32List _beats = Int32List(0);   // sample numbers of the R waves
   int? _averageBpm;                  // whole recording, null = not enough beats
+  RrStats? _stats;                   // min / max bpm, HRV, tachogram, null = not enough beats
+  // the note, can be changed here, then the list has to read the files again when going back
+  late String _note = widget.recording.note;
+  bool _changed = false;
+  bool _makingReport = false;   // the PDF button shows a spinner meanwhile
   // for the 5 s window, ValueNotifiers so the full screen chart gets them too
   final ValueNotifier<int?> _windowBpm = ValueNotifier(null);
   final ValueNotifier<List<int>> _windowBeats = ValueNotifier(const []);   // positions in the window
+  // the marked events of the whole recording, and the ones inside the window (positions in it)
+  Int32List _events = Int32List(0);
+  final ValueNotifier<List<int>> _windowEvents = ValueNotifier(const []);
 
   int get _maxStart => max(0, (_samples?.length ?? 0) - _window.capacity);
 
@@ -59,7 +69,9 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
       setState(() {
         _samples = data.millivolts;
         _beats = data.beats;
+        _events = data.events;
         _averageBpm = HeartRateDetector.averageBpm(data.beats, sampleRateHz);
+        _stats = RrStats.fromBeats(data.beats, sampleRateHz);   // a few hundred beats, fast enough here
       });
       _showWindow(0);
     } catch (e) {
@@ -82,12 +94,14 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
     // the beats inside the window, counted from its left edge (= positions in the buffer)
     _windowBeats.value = [for (int beat in _beats) if (beat >= start && beat < end) beat - start];
     _windowBpm.value = HeartRateDetector.bpmBetween(_beats, start, end, sampleRateHz);
+    _windowEvents.value = [for (int event in _events) if (event >= start && event < end) event - start];
   }
 
   @override
   void dispose() {
     _windowBpm.dispose();
     _windowBeats.dispose();
+    _windowEvents.dispose();
     _window.dispose();    // because EkgBuffer is ChangeNotifier
     super.dispose();
   }
@@ -99,6 +113,19 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
       appBar: AppBar(
         title: Text(RecordingsScreen.formatStart(widget.recording.start, t)),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_note),
+            tooltip: t.noteEdit,
+            onPressed: _editNote,
+          ),
+          // PDF report, only after the samples are loaded
+          IconButton(
+            icon: _makingReport
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.picture_as_pdf),
+            tooltip: t.reportButton,
+            onPressed: _samples == null || _makingReport ? null : _shareReport,
+          ),
           IconButton(
             icon: const Icon(Icons.share),
             tooltip: t.commonShare,
@@ -115,8 +142,35 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
           ),
         ],
       ),
-      body: _buildBody(),
+      // PopScope: after a note change, going back returns true like after deleting,
+      // so the list reads the files again and shows the new note
+      body: PopScope(
+        canPop: !_changed,
+        onPopInvokedWithResult: (didPop, result) {
+          if (!didPop) Navigator.of(context).pop(true);
+        },
+        child: _buildBody(),
+      ),
     );
+  }
+
+  Future<void> _shareReport() async {
+    Float32List? samples = _samples;
+    if (samples == null) return;
+    setState(() => _makingReport = true);
+    await shareReport(context, widget.recording,
+        note: _note, millivolts: samples, beats: _beats, events: _events, stats: _stats);
+    if (mounted) setState(() => _makingReport = false);
+  }
+
+  Future<void> _editNote() async {
+    String? note = await editRecordingNote(context, widget.recording, _note);
+    if (note != null && mounted) {
+      setState(() {
+        _note = note;
+        _changed = true;
+      });
+    }
   }
 
   Widget _buildBody() {
@@ -162,6 +216,7 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
                         sampleRateHz: sampleRateHz,
                         mvPerBigSquare: _mvPerBigSquare,
                         beatMarkers: _windowBeats,   // red triangles under the R waves
+                        eventMarkers: _windowEvents, // blue lines at the marked events
                       ),
                     ),
                     Positioned(top: 0, right: 0, child: FullscreenButton(onPressed: _openFullscreen)),
@@ -171,6 +226,10 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
             ),
           ),
           const SizedBox(height: 8),
+          if (_note.isNotEmpty) ...[
+            Text(_note, style: Theme.of(context).textTheme.titleMedium, textAlign: TextAlign.center),
+            const SizedBox(height: 4),
+          ],
           Text('${RecordingsScreen.formatDuration(windowFrom)} – '
               '${RecordingsScreen.formatDuration(windowTo)}  /  '
               '${RecordingsScreen.formatDuration(total)}'),
@@ -192,11 +251,30 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
               max: _maxStart.toDouble(),
               onChanged: (value) => _showWindow(value.round()),
             ),
+          // the marked events: a tap shows the event in the middle of the chart
+          if (_events.isNotEmpty)
+            Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              children: [
+                Text(AppLocalizations.of(context).viewEvents),
+                for (int event in _events)
+                  ActionChip(
+                    avatar: const Icon(Icons.flag, color: EkgChart.eventColor, size: 18),
+                    label: Text(RecordingsScreen.formatDuration(_sampleTime(event))),
+                    onPressed: () => _showWindow(event - _window.capacity ~/ 2),
+                  ),
+              ],
+            ),
           const SizedBox(height: 8),
           ZoomSelector(   // Auto ×1 ×2 ×4 ×8, the same on every screen
             value: _mvPerBigSquare,
             onChanged: (mv) => setState(() => _mvPerBigSquare = mv),
           ),
+          const SizedBox(height: 16),
+          // the whole recording: heart rate min / avg / max, HRV and the tachogram
+          RecordingStatsCard(stats: _stats, durationSeconds: samples.length / sampleRateHz),
         ],
       ),
       ),
@@ -213,6 +291,7 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
       onDragSamples: (samples) => _showWindow(_windowStart + samples),
       bpm: _windowBpm,
       beatMarkers: _windowBeats,
+      eventMarkers: _windowEvents,
     );
     if (mv != null && mounted) setState(() => _mvPerBigSquare = mv);   // zoom chosen in full screen
   }

@@ -54,4 +54,21 @@ void main() {
       expect((c.controls.computeLuminance() - bg).abs(), greaterThan(0.3));
     }
   });
+
+  testWidgets('event and beat markers are drawn and follow their ValueNotifiers', (tester) async {
+    EkgBuffer buffer = EkgBuffer(1250)..addAll(List.filled(1250, 0.5));
+    ValueNotifier<List<int>> beats = ValueNotifier([100, 300]);
+    ValueNotifier<List<int>> events = ValueNotifier([200]);
+    addTearDown(buffer.dispose);
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: EkgChart(buffer: buffer, sampleRateHz: 250, beatMarkers: beats, eventMarkers: events),
+    ));
+    events.value = [50, 1249];   // moving the window: new positions, the chart repaints by itself
+    await tester.pump();
+    events.value = [];
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+  });
 }

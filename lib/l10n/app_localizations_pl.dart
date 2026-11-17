@@ -21,6 +21,42 @@ class AppLocalizationsPl extends AppLocalizations {
   String get commonDelete => 'Usuń';
 
   @override
+  String get commonSave => 'ZAPISZ';
+
+  @override
+  String get noteEdit => 'Notatka';
+
+  @override
+  String get noteDialogTitle => 'Notatka do nagrania';
+
+  @override
+  String get noteHint => 'np. spoczynek, po bieganiu';
+
+  @override
+  String noteSaveError(String error) {
+    return 'Nie udało się zapisać notatki: $error';
+  }
+
+  @override
+  String get deviceNoteLabel => 'Notatka (opcjonalnie)';
+
+  @override
+  String get deviceEvent => 'Zaznacz zdarzenie';
+
+  @override
+  String deviceEventCount(int count) {
+    return 'Zaznacz zdarzenie ($count)';
+  }
+
+  @override
+  String deviceEventSaved(String time) {
+    return 'Zaznaczono zdarzenie: $time';
+  }
+
+  @override
+  String get viewEvents => 'Zdarzenia:';
+
+  @override
   String get appTitle => 'EKG';
 
   @override
@@ -74,6 +110,17 @@ class AppLocalizationsPl extends AppLocalizations {
   @override
   String get settingsChartMatchesPaletteHint =>
       'Wyłączone: różowy papier (jasny) / zielony monitor (ciemny)';
+
+  @override
+  String get settingsSound => 'Dźwięk';
+
+  @override
+  String get settingsBeepOnBeat =>
+      'Sygnał dźwiękowy przy każdym uderzeniu serca';
+
+  @override
+  String get settingsBeepOnBeatHint =>
+      'Jak monitor w szpitalu, głośność zmieniają przyciski głośności (multimedia)';
 
   @override
   String get paletteRed => 'Czerwony';
@@ -213,6 +260,20 @@ class AppLocalizationsPl extends AppLocalizations {
   }
 
   @override
+  String deviceSignalStrength(int rssi, String level) {
+    return 'Sygnał BLE: $rssi dBm ($level)';
+  }
+
+  @override
+  String get signalStrong => 'silny';
+
+  @override
+  String get signalFair => 'średni';
+
+  @override
+  String get signalWeak => 'słaby – przysuń telefon bliżej';
+
+  @override
   String deviceRejectedPackets(
     int count,
     int length,
@@ -250,6 +311,70 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get viewNoSamples => 'Nagranie nie zawiera próbek.';
+
+  @override
+  String get statsTitle => 'Statystyki nagrania';
+
+  @override
+  String get reportButton => 'Raport PDF';
+
+  @override
+  String get reportTitle => 'Raport EKG';
+
+  @override
+  String get reportStart => 'Początek';
+
+  @override
+  String get reportLength => 'Długość';
+
+  @override
+  String get reportDevice => 'Urządzenie';
+
+  @override
+  String get reportNote => 'Notatka';
+
+  @override
+  String reportEkg(int speed, int gain) {
+    return 'EKG ($speed mm/s, $gain mm/mV, filtr 0,5–40 Hz)';
+  }
+
+  @override
+  String reportFirstSeconds(int seconds) {
+    return 'Pierwsze $seconds s nagrania.';
+  }
+
+  @override
+  String get reportDisclaimer =>
+      'Wykonano w projekcie studenckim, to nie jest wyrób medyczny – nie służy do diagnozy.';
+
+  @override
+  String reportError(String error) {
+    return 'Nie udało się utworzyć raportu: $error';
+  }
+
+  @override
+  String get statsNotEnoughBeats => 'Za mało uderzeń serca do statystyk.';
+
+  @override
+  String get statsMin => 'Min.';
+
+  @override
+  String get statsAverage => 'Średnio';
+
+  @override
+  String get statsMax => 'Maks.';
+
+  @override
+  String statsBeats(int beats, int excluded) {
+    return 'Uderzenia: $beats, pominięte odstępy: $excluded (zgubione uderzenia, artefakty)';
+  }
+
+  @override
+  String get statsTachogram => 'Odstępy RR w czasie (tachogram)';
+
+  @override
+  String get statsHrvHint =>
+      'HRV (SDNN, RMSSD) jest wiarygodne tylko dla spokojnego nagrania trwającego co najmniej 1 minutę, bez ruchu.';
 
   @override
   String shareSubject(String date) {

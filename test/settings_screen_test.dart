@@ -58,4 +58,27 @@ void main() {
     await tester.pumpAndSettle();
     expect(AppSettings.instance.chartMatchesPalette, isFalse);
   });
+
+  testWidgets('the beep switch: off by default, tapping turns it on and off', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: const SettingsScreen(),
+    ));
+    await tester.pumpAndSettle();
+
+    Finder beep = find.text('Beep on every heart beat');
+    await tester.ensureVisible(beep);   // scroll to it if the list is longer than the screen
+    await tester.pumpAndSettle();
+    expect(AppSettings.instance.beepOnBeat, isFalse);
+    await tester.tap(beep);
+    await tester.pumpAndSettle();
+    expect(AppSettings.instance.beepOnBeat, isTrue);
+    await tester.tap(beep);
+    await tester.pumpAndSettle();
+    expect(AppSettings.instance.beepOnBeat, isFalse);
+  });
 }

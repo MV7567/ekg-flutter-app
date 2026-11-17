@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ecg_ble_app/ekg_config.dart';
+import 'package:ecg_ble_app/recording/csv_recorder.dart';
 import 'package:ecg_ble_app/recording/recording_file.dart';
 
 // header exactly as CsvRecorder writes it (format 1)
@@ -61,5 +63,77 @@ void main() {
     expect(RecordingInfo.durationFromLastLines(['499,1.996,10,0.0610', '50']),
         const Duration(seconds: 2));
     expect(RecordingInfo.durationFromLastLines(header), Duration.zero);
+  });
+
+  // ---- the footer: average bpm and note at the end of the file ----
+
+  test('footer lines: only what is known', () {
+    expect(CsvRecorder.footerLines(averageBpm: 78, note: 'rest'), ['# average bpm: 78', '# note: rest']);
+    expect(CsvRecorder.footerLines(averageBpm: null, note: ''), isEmpty);   // too few beats, no note
+    expect(CsvRecorder.footerLines(note: '   '), isEmpty);                 // only spaces = no note
+  });
+
+  test('note: one line, trimmed, at most 80 characters', () {
+    expect(CsvRecorder.cleanNote('  po bieganiu \n zmęczony\r\n'), 'po bieganiu zmęczony');
+    expect(CsvRecorder.cleanNote('x' * 200).length, CsvRecorder.maxNoteLength);
+  });
+
+  test('note: the LAST note line counts (a changed note is appended), "" removes it', () {
+    List<String> tail = ['499,1.996,10,0.0610', '# average bpm: 78', '# note: rest', '# note: after running'];
+    expect(RecordingInfo.parseNote(tail), 'after running');
+    expect(RecordingInfo.parseNote([...tail, '# note: ']), '');
+    expect(RecordingInfo.parseNote(['499,1.996,10,0.0610']), '');   // old file
+    expect(RecordingInfo.parseAverageBpm(tail), 78);
+    expect(RecordingInfo.parseAverageBpm(['499,1.996,10,0.0610']), isNull);
+  });
+
+  test('the footer changes neither the duration nor the samples', () {
+    List<String> lines = [...header, '0,0.000,10,0.0610', '1,0.004,20,0.1221', '# average bpm: 78', '# note: a, b, c, d'];
+    expect(RecordingInfo.durationFromLastLines(lines), const Duration(milliseconds: 8));
+    expect(RecordingInfo.parseMillivolts(lines).length, 2);
+  });
+
+  test('a real file: written, note changed later, read back', () async {
+    Directory folder = await Directory.systemTemp.createTemp('ekg_test');
+    addTearDown(() => folder.delete(recursive: true));
+    File file = File('${folder.path}/ekg_2026-11-04_14-30-05.csv');
+    List<String> samples = [for (int i = 0; i < 2500; i++) CsvRecorder.csvLine(i, 100)];   // 10 s
+    String text = [...header, ...samples, ...CsvRecorder.footerLines(averageBpm: 74, note: 'rest')].join('\n');
+    await file.writeAsString('$text\n');
+
+    RecordingInfo info = await RecordingInfo.load(file);
+    expect((info.note, info.averageBpm, info.duration), ('rest', 74, const Duration(seconds: 10)));
+
+    await CsvRecorder.appendNote(file.path, 'after\nrunning');
+    info = await RecordingInfo.load(file);
+    expect(info.note, 'after running');
+    expect(info.averageBpm, 74);
+    expect(info.duration, const Duration(seconds: 10));
+  });
+
+  // ---- events: "# event: 5712" lines between the samples ----
+
+  test('events: every event line, in order, nothing else', () {
+    List<String> lines = [...header, '0,0.000,10,0.0610', '# event: 1', '1,0.004,20,0.1221', '# event: 5712',
+        '# event: broken', '# note: event'];
+    expect(RecordingInfo.parseEvents(lines), [1, 5712]);
+    expect(RecordingInfo.parseEvents(header), isEmpty);   // a recording without events
+  });
+
+  test('a real file with events: the samples are not changed, the events are found', () async {
+    Directory folder = await Directory.systemTemp.createTemp('ekg_test');
+    addTearDown(() => folder.delete(recursive: true));
+    File file = File('${folder.path}/ekg_2026-11-04_14-30-05.csv');
+    List<String> lines = [...header];
+    for (int i = 0; i < 2500; i++) {
+      lines.add(CsvRecorder.csvLine(i, 100));
+      if (i == 700 || i == 1800) lines.add('${CsvRecorder.eventTag} $i');   // like writeEvent()
+    }
+    await file.writeAsString('${lines.join('\n')}\n');
+
+    RecordingData data = RecordingInfo.loadForView(file.path);
+    expect(data.millivolts.length, 2500);
+    expect(data.events, [700, 1800]);
+    expect((await RecordingInfo.load(file)).duration, const Duration(seconds: 10));
   });
 }

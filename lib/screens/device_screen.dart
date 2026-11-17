@@ -17,6 +17,8 @@ import '../widgets/fullscreen_chart.dart';
 import '../widgets/zoom_selector.dart';
 import '../widgets/heart_rate_text.dart';
 import '../widgets/signal_quality_text.dart';
+import '../widgets/signal_strength_text.dart';             // BLE signal strength (RSSI)
+import '../beat_beep.dart';                                 // beep on every heart beat
 import '../settings/app_settings.dart';                     // recording length
 import 'instructions_screen.dart';                          // how to measure
 
@@ -101,6 +103,10 @@ class _DeviceScreenState extends State<DeviceScreen> {
   final SignalQualityMonitor _qualityMonitor =
       SignalQualityMonitor(sampleRateHz, adcLimitMillivolts: 32000 * millivoltsPerLsb);
   final ValueNotifier<SignalQuality> _quality = ValueNotifier(SignalQuality.checking);
+  // BLE signal strength in dBm, read every 2 s while connected, null = not known (not connected)
+  final ValueNotifier<int?> _rssi = ValueNotifier(null);
+  Timer? _rssiTimer;
+  bool _readingRssi = false;   // a slow answer: no new question before it comes
   // chart filters: .toDouble() is needed because sampleRateHz is int, and the filters works on decimal vals
 
   // chart amplitude scale: how many mV one big square means
@@ -110,6 +116,14 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
   // timed recording: number of samples after which the recording stops, null = manual (until STOP)
   int? _sampleLimit;
+
+  // the optional note written before START ("rest", "after running"), saved in the file footer,
+  // it stays for the next recording (a series of recordings often has the same note)
+  final TextEditingController _noteController = TextEditingController();
+  // every beat of this recording, for the average heart rate in the footer
+  final List<int> _recordingBeats = [];
+  // how many events were marked in this recording (the event button)
+  int _eventCount = 0;
 
   // test signal mode: the generator calls _processEkgData like the BLE notifications do
   bool get _isTestSignal => widget.device == null;
@@ -152,6 +166,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
       // Updating state. mounted is checked for the same reason as in the scanner 
 
       if (state == BluetoothConnectionState.connected) {
+        _startRssiReading();
         // when connected, discover services
         await _discoverAndSubscribe();
         // After connecting we also have to discover services. Just the connection doesn't say what characteristics the device has, it has to be asked
@@ -159,6 +174,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
         // the ESP32 stops measuring by itself when the phone disconnects,
         // so the file is closed here to keep the data recorded so far
         _controlCharacteristic = null;
+        _stopRssiReading();
         if (_isRecording) {
           // if saving failed, _finishRecording already showed a warning
           if (await _finishRecording()) _showMessage((t) => t.deviceConnectionLost);
@@ -187,6 +203,34 @@ class _DeviceScreenState extends State<DeviceScreen> {
   // correct connection. on android connect() immediately asks for MTU 512 too, aka larger packets.
   // its needed because the packet has 21 bytes, while default MTU (23) fits only 20 bytes. The result of the connection comes through the stream connectionState, 
   // not from this function. Its the same as the scanning: the function only activates the action but the results come through the stream
+
+  // ---------------- BLE signal strength ----------------
+
+  // reads the RSSI at once and then every 2 s, shown under the connection state
+  void _startRssiReading() {
+    _rssiTimer?.cancel();   // never two timers (after RECONNECT)
+    _readRssi();
+    _rssiTimer = Timer.periodic(const Duration(seconds: 2), (_) => _readRssi());
+  }
+
+  void _stopRssiReading() {
+    _rssiTimer?.cancel();
+    _rssiTimer = null;
+    _rssi.value = null;   // not connected = no signal strength to show
+  }
+
+  Future<void> _readRssi() async {
+    if (_readingRssi) return;
+    _readingRssi = true;
+    try {
+      int rssi = await widget.device!.readRssi();
+      if (mounted && _rssiTimer != null) _rssi.value = rssi;   // not after a disconnect or dispose
+    } catch (e) {
+      debugPrint("RSSI read error: $e");   // e.g. just disconnected, the next read tries again
+    } finally {
+      _readingRssi = false;
+    }
+  }
 
   // discover services and subscribe to the target characteristic
   Future<void> _discoverAndSubscribe() async {
@@ -295,6 +339,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
     _displayFilter.reset(); // and the filters forget the previous recording
     _spikeRemover.reset();
     _heartRate.reset();     // and the beat detector too
+    _recordingBeats.clear();
+    _eventCount = 0;
     _bpm.value = null;
     _qualityMonitor.reset();
     _quality.value = SignalQuality.checking;
@@ -366,6 +412,15 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
   // stops writing and closes the file, packets arriving after this are ignored
   // returns false if the file could not be written completely
+  // the event button: marks the newest sample in the file, shown later on the recording chart
+  void _markEvent() {
+    int sample = _decoder.sampleCount - 1;   // the last sample received
+    if (!_isRecording || sample < 0) return;
+    _recorder.writeEvent(sample);
+    setState(() => _eventCount++);
+    _showMessage((t) => t.deviceEventSaved(DeviceScreen.durationLabel(sample ~/ sampleRateHz)));
+  }
+
   Future<bool> _finishRecording() async {
     _isRecording = false;
     _setKeepScreenOn(false);   // the phone may go dark again as usual
@@ -373,7 +428,9 @@ class _DeviceScreenState extends State<DeviceScreen> {
     _uiTimer = null;
 
     // writes the rest, closes the file and registers it in the file manager
-    bool saved = await _recorder.close();
+    // the footer gets the average heart rate and the note
+    bool saved = await _recorder.close(
+        averageBpm: HeartRateDetector.averageBpm(_recordingBeats, sampleRateHz), note: _noteController.text);
     if (!saved) _showMessage((t) => t.deviceIncomplete);
 
     if (mounted) setState(() {});
@@ -415,7 +472,11 @@ class _DeviceScreenState extends State<DeviceScreen> {
       double filtered = _displayFilter.process(millivolts);
       packetMillivolts.add(filtered);   // filtered value for the chart
       // and for the beat detector, true = this sample finished a beat
-      if (_heartRate.addSample(packet.firstSampleIndex + i, filtered)) _beatCount.value++;
+      if (_heartRate.addSample(packet.firstSampleIndex + i, filtered)) {
+        _beatCount.value++;
+        _recordingBeats.add(_heartRate.lastBeat!);
+        if (AppSettings.instance.beepOnBeat) BeatBeep.play();   // not awaited, the samples don't wait for the sound
+      }
       _qualityMonitor.addSample(millivolts, filtered);   // raw for "electrode off", filtered for the rest
     }
     // It's a classic for loop: start from i=0, condition i<10, and i++.
@@ -513,13 +574,16 @@ class _DeviceScreenState extends State<DeviceScreen> {
     // closing order
     // 1. Cancel the BLE subscriptions and the UI timer
     _uiTimer?.cancel();
+    _rssiTimer?.cancel();
+    _rssiTimer = null;
     _testSignal?.stop();
     _bleSubscription?.cancel();
     _connectionSubscription?.cancel();
     // 2. Close the file (leaving the screen during a recording), not awaited, dispose can't wait
     _isRecording = false;
     _setKeepScreenOn(false);
-    _recorder.close();
+    _recorder.close(
+        averageBpm: HeartRateDetector.averageBpm(_recordingBeats, sampleRateHz), note: _noteController.text);
     // 3. Disconnect the device (the ESP32 stops the measurement when the phone disconnects)
     // catchError: an error here (e.g. already disconnected) is only printed, not "Unhandled exception"
     widget.device?.disconnect().catchError((e) => debugPrint("Disconnect error: $e"));
@@ -528,6 +592,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
     _bpm.dispose();
     _beatCount.dispose();
     _quality.dispose();
+    _rssi.dispose();
+    _noteController.dispose();
     super.dispose();
   }
 
@@ -618,6 +684,11 @@ class _DeviceScreenState extends State<DeviceScreen> {
                       color: connected ? Colors.green : (connecting ? Colors.orange : Colors.red),
                     ),
                   ),
+                  // BLE signal strength, only with a real device (shows nothing before the first read)
+                  if (connected && !_isTestSignal) ...[
+                    const SizedBox(height: 6),
+                    SignalStrengthText(rssi: _rssi),
+                  ],
                   const SizedBox(height: 30),
 
                   // connect() is running
@@ -653,6 +724,15 @@ class _DeviceScreenState extends State<DeviceScreen> {
                           },
                         ),
                       ],
+                    ),
+                    // optional note, saved at the end of the file
+                    SizedBox(
+                      width: 280,
+                      child: TextField(
+                        controller: _noteController,
+                        maxLength: CsvRecorder.maxNoteLength,
+                        decoration: InputDecoration(labelText: t.deviceNoteLabel, hintText: t.noteHint),
+                      ),
                     ),
                     TextButton(
                       onPressed: () => Navigator.of(context).push(
@@ -697,6 +777,13 @@ class _DeviceScreenState extends State<DeviceScreen> {
                         ),
                       ),
                     ],
+                    const SizedBox(height: 10),
+                    // marks a moment in the file (cough, standing up...), shown later on the chart
+                    OutlinedButton.icon(
+                      onPressed: _markEvent,
+                      icon: const Icon(Icons.flag, color: EkgChart.eventColor),
+                      label: Text(_eventCount == 0 ? t.deviceEvent : t.deviceEventCount(_eventCount)),
+                    ),
                     const SizedBox(height: 10),
                     Text(t.deviceSamples(_decoder.sampleCount)),
                     Text(t.deviceLostPackets(_decoder.lostPackets),

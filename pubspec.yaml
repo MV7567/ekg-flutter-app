@@ -41,6 +41,12 @@ dependencies:
   share_plus: ^13.3.1
   shared_preferences: ^2.5.6
   wakelock_plus: ^1.7.0
+  pdf: ^3.12.0
+
+# image 4.11+ (used by pdf and flutter_launcher_icons) calls a function of archive 4.1+,
+# but pdf 3.12 allows only archive < 4.1, so image 4.11 doesn't compile -> an older image
+dependency_overrides:
+  image: ">=4.5.0 <4.11.0"
 
 dev_dependencies:
   flutter_test:
@@ -68,6 +74,12 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  # fonts for the PDF report: the built-in PDF font (Helvetica) has no Polish letters (ą, ę, ł...)
+  # Roboto from the Flutter SDK, Apache 2.0 license (assets/fonts/LICENSE-Roboto.txt)
+  assets:
+    - assets/fonts/Roboto-Regular.ttf
+    - assets/fonts/Roboto-Bold.ttf
 
   # To add assets to your application, add an assets section, like this:
   # assets:

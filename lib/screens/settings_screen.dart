@@ -66,6 +66,15 @@ class SettingsScreen extends StatelessWidget {
               onChanged: settings.setChartMatchesPalette,
             ),
 
+            _header(t.settingsSound),
+            // a beep on every heart beat, like a hospital monitor
+            SwitchListTile(
+              title: Text(t.settingsBeepOnBeat),
+              subtitle: Text(t.settingsBeepOnBeatHint),
+              value: settings.beepOnBeat,
+              onChanged: settings.setBeepOnBeat,
+            ),
+
             _header(t.settingsLanguage),
             RadioGroup<String>(
               groupValue: settings.languageCode,
