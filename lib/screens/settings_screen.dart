@@ -75,6 +75,15 @@ class SettingsScreen extends StatelessWidget {
               onChanged: settings.setBeepOnBeat,
             ),
 
+            _header(t.settingsAdvanced),
+            // technical details and the test signal, hidden for a usual user
+            SwitchListTile(
+              title: Text(t.settingsAdvancedFeatures),
+              subtitle: Text(t.settingsAdvancedFeaturesHint),
+              value: settings.advancedFeatures,
+              onChanged: settings.setAdvancedFeatures,
+            ),
+
             _header(t.settingsLanguage),
             RadioGroup<String>(
               groupValue: settings.languageCode,

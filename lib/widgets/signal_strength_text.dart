@@ -9,9 +9,10 @@ enum SignalStrength { strong, fair, weak }
 // RSSI = Received Signal Strength Indicator, in dBm, always negative: closer to 0 = stronger
 // a weak signal = lost packets = gaps in the recording, so it tells you to move the phone closer
 class SignalStrengthText extends StatelessWidget {
-  const SignalStrengthText({super.key, required this.rssi});
+  const SignalStrengthText({super.key, required this.rssi, this.showDbm = true});
 
   final ValueListenable<int?> rssi;   // null = not read yet, nothing is shown
+  final bool showDbm;                 // false = only the bars and "strong / fair / weak" (no advanced features)
 
   // usual BLE limits: above -70 dBm everything arrives, under -85 dBm packets start to get lost
   static SignalStrength strength(int rssi) {
@@ -47,7 +48,9 @@ class SignalStrengthText extends StatelessWidget {
           children: [
             Icon(icon, color: color, size: 20),
             const SizedBox(width: 6),
-            Flexible(child: Text(t.deviceSignalStrength(value, levelText(t, s)), textAlign: TextAlign.center)),
+            Flexible(child: Text(
+                showDbm ? t.deviceSignalStrength(value, levelText(t, s)) : t.deviceSignalLevel(levelText(t, s)),
+                textAlign: TextAlign.center)),
           ],
         );
       },

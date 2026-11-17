@@ -19,6 +19,11 @@ class PdfReport {
   static const double stripHeightMm = 30;      // 6 big squares
   static const int maxStrips = 10;             // 60 s of EKG, a 10 min recording would be 100 strips
 
+  // the strips start at 0:02: in the first ~2 s after START the signal settles
+  // (electrodes, input of the ADS1194: a step or a drift of 0.4..4 mV in real recordings),
+  // the 0.5 Hz high-pass turns it into a big hump, which is not the heart
+  static const double skipSeconds = 2;
+
   // amplitude in mm/mV: 10 = the standard (x1), then x2, x4, x8 like the zoom in the app
   // a lead I QRS of ~0.3 mV is only 3 mm at 10 mm/mV, so the report chooses like "Auto"
   static const List<int> gains = [10, 20, 40, 80];
@@ -50,6 +55,13 @@ class PdfReport {
     return best;
   }
 
+  // the first sample on the strips: 2 s in, but only when there is still a whole strip after it
+  // (a very short recording is shown from 0:00, otherwise there would be almost nothing)
+  static int firstStripSample(int samples, int sampleRateHz) {
+    int skip = (skipSeconds * sampleRateHz).round();
+    return samples >= skip + stripSeconds * sampleRateHz ? skip : 0;
+  }
+
   // how many strips: the whole recording, at most 10
   static int stripCount(int samples, int sampleRateHz) =>
       min(maxStrips, (samples / (stripSeconds * sampleRateHz)).ceil());
@@ -69,9 +81,12 @@ class PdfReport {
     required int sampleRateHz,
   }) async {
     double mm = PdfPageFormat.mm;   // 1 mm in PDF points (1/72 inch)
-    int gain = chooseGain(millivolts, sampleRateHz);
+    int first = firstStripSample(millivolts.length, sampleRateHz);
+    // the gain only from what is on the strips, the settling hump doesn't count
+    int gain = chooseGain(Float32List.sublistView(millivolts, first), sampleRateHz);
     int samplesPerStrip = (stripSeconds * sampleRateHz).round();
-    int strips = stripCount(millivolts.length, sampleRateHz);
+    int strips = stripCount(millivolts.length - first, sampleRateHz);
+    int stripsEnd = min(first + strips * samplesPerStrip, millivolts.length);
     Duration length = Duration(milliseconds: (millivolts.length * 1000 / sampleRateHz).round());
     // sample number -> "0:06" for the label above a strip
     String time(int sample) =>
@@ -132,8 +147,10 @@ class PdfReport {
         // the EKG strips
         pw.Text(t.reportEkg(paperSpeedMmPerS.round(), gain),
             style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
-        if (millivolts.length > maxStrips * samplesPerStrip)
-          pw.Text(t.reportFirstSeconds((maxStrips * stripSeconds).round()), style: const pw.TextStyle(fontSize: 8)),
+        // "0:02 – 1:02 of the recording, the first 2 s are left out..."
+        if (first > 0)
+          pw.Text(t.reportStripsRange(time(first), time(stripsEnd), skipSeconds.round()),
+              style: const pw.TextStyle(fontSize: 8)),
         pw.SizedBox(height: 2 * mm),
         // Inseparable: MultiPage never splits it (a Column alone can be split!),
         // so the time label always stays on the same page as its strip
@@ -142,9 +159,10 @@ class PdfReport {
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Text('${time(k * samplesPerStrip)} – ${time(min((k + 1) * samplesPerStrip, millivolts.length))}',
+                pw.Text('${time(first + k * samplesPerStrip)} – '
+                    '${time(min(first + (k + 1) * samplesPerStrip, millivolts.length))}',
                     style: const pw.TextStyle(fontSize: 8)),
-                _strip(millivolts, k * samplesPerStrip, samplesPerStrip, beats, events, gain, sampleRateHz),
+                _strip(millivolts, first + k * samplesPerStrip, samplesPerStrip, beats, events, gain, sampleRateHz),
                 pw.SizedBox(height: 3 * mm),
               ],
             ),

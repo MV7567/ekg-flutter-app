@@ -122,6 +122,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'Like a hospital monitor, the volume buttons (media) change the loudness';
 
   @override
+  String get settingsAdvanced => 'Advanced';
+
+  @override
+  String get settingsAdvancedFeatures => 'Advanced features';
+
+  @override
+  String get settingsAdvancedFeaturesHint =>
+      'Technical details while measuring (samples, packets, dBm, file path) and the test signal without the device';
+
+  @override
   String get paletteRed => 'Red';
 
   @override
@@ -264,6 +274,19 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String deviceSignalLevel(String level) {
+    return 'BLE signal: $level';
+  }
+
+  @override
+  String get deviceSomeDataLost =>
+      'Some data did not arrive, move the phone closer to the device';
+
+  @override
+  String get deviceRecordingSaved =>
+      'Recording saved, you will find it in the list of recordings';
+
+  @override
   String get signalStrong => 'strong';
 
   @override
@@ -338,8 +361,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String reportFirstSeconds(int seconds) {
-    return 'The first $seconds s of the recording.';
+  String reportStripsRange(String from, String to, int skipped) {
+    return '$from – $to of the recording, the first $skipped s are left out (the signal settles after START).';
   }
 
   @override

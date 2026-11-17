@@ -308,6 +308,24 @@ abstract class AppLocalizations {
   /// **'Like a hospital monitor, the volume buttons (media) change the loudness'**
   String get settingsBeepOnBeatHint;
 
+  /// No description provided for @settingsAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced'**
+  String get settingsAdvanced;
+
+  /// No description provided for @settingsAdvancedFeatures.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced features'**
+  String get settingsAdvancedFeatures;
+
+  /// No description provided for @settingsAdvancedFeaturesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Technical details while measuring (samples, packets, dBm, file path) and the test signal without the device'**
+  String get settingsAdvancedFeaturesHint;
+
   /// No description provided for @paletteRed.
   ///
   /// In en, this message translates to:
@@ -554,6 +572,24 @@ abstract class AppLocalizations {
   /// **'BLE signal: {rssi} dBm ({level})'**
   String deviceSignalStrength(int rssi, String level);
 
+  /// No description provided for @deviceSignalLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'BLE signal: {level}'**
+  String deviceSignalLevel(String level);
+
+  /// No description provided for @deviceSomeDataLost.
+  ///
+  /// In en, this message translates to:
+  /// **'Some data did not arrive, move the phone closer to the device'**
+  String get deviceSomeDataLost;
+
+  /// No description provided for @deviceRecordingSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording saved, you will find it in the list of recordings'**
+  String get deviceRecordingSaved;
+
   /// No description provided for @signalStrong.
   ///
   /// In en, this message translates to:
@@ -674,11 +710,11 @@ abstract class AppLocalizations {
   /// **'EKG ({speed} mm/s, {gain} mm/mV, filtered 0.5–40 Hz)'**
   String reportEkg(int speed, int gain);
 
-  /// No description provided for @reportFirstSeconds.
+  /// No description provided for @reportStripsRange.
   ///
   /// In en, this message translates to:
-  /// **'The first {seconds} s of the recording.'**
-  String reportFirstSeconds(int seconds);
+  /// **'{from} – {to} of the recording, the first {skipped} s are left out (the signal settles after START).'**
+  String reportStripsRange(String from, String to, int skipped);
 
   /// No description provided for @reportDisclaimer.
   ///

@@ -687,7 +687,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                   // BLE signal strength, only with a real device (shows nothing before the first read)
                   if (connected && !_isTestSignal) ...[
                     const SizedBox(height: 6),
-                    SignalStrengthText(rssi: _rssi),
+                    SignalStrengthText(rssi: _rssi, showDbm: AppSettings.instance.advancedFeatures),
                   ],
                   const SizedBox(height: 30),
 
@@ -785,23 +785,33 @@ class _DeviceScreenState extends State<DeviceScreen> {
                       label: Text(_eventCount == 0 ? t.deviceEvent : t.deviceEventCount(_eventCount)),
                     ),
                     const SizedBox(height: 10),
-                    Text(t.deviceSamples(_decoder.sampleCount)),
-                    Text(t.deviceLostPackets(_decoder.lostPackets),
-                      style: TextStyle(color: _decoder.lostPackets > 0 ? Colors.orange : null)), // null colors means the default, 
-                      // the lost packet list becomes orange when the number is bigger than zero
-                    // packets of the wrong size are not saved, usually the MTU is too small
-                    if (_decoder.badPackets > 0)
-                      Text(t.deviceRejectedPackets(_decoder.badPackets, _decoder.lastBadLength, packetLength, '${widget.device?.mtuNow}'),
-                        style: const TextStyle(color: Colors.red), textAlign: TextAlign.center),
+                    // the technical numbers only with the advanced features (Settings),
+                    // a usual user only gets a warning when something is missing
+                    if (AppSettings.instance.advancedFeatures) ...[
+                      Text(t.deviceSamples(_decoder.sampleCount)),
+                      Text(t.deviceLostPackets(_decoder.lostPackets),
+                        style: TextStyle(color: _decoder.lostPackets > 0 ? Colors.orange : null)), // null colors means the default, 
+                        // the lost packet list becomes orange when the number is bigger than zero
+                      // packets of the wrong size are not saved, usually the MTU is too small
+                      if (_decoder.badPackets > 0)
+                        Text(t.deviceRejectedPackets(_decoder.badPackets, _decoder.lastBadLength, packetLength, '${widget.device?.mtuNow}'),
+                          style: const TextStyle(color: Colors.red), textAlign: TextAlign.center),
+                    ] else if (_decoder.lostPackets > 0 || _decoder.badPackets > 0)
+                      Text(t.deviceSomeDataLost,
+                          style: const TextStyle(color: Colors.orange), textAlign: TextAlign.center),
                   ],
 
                   // last saved file
-                  if (_recorder.filePath.isNotEmpty) ...[
+                  // the path only with the advanced features, otherwise a short "saved" after the recording
+                  if (_recorder.filePath.isNotEmpty && AppSettings.instance.advancedFeatures) ...[
                     const SizedBox(height: 30),
                     Text(_isRecording ? t.deviceSavingTo : t.deviceLastSaved,
                       style: const TextStyle(fontSize: 14)),
                     Text(_recorder.filePath,
                       style: const TextStyle(fontSize: 12, color: Colors.grey), textAlign: TextAlign.center),
+                  ] else if (_recorder.filePath.isNotEmpty && !_isRecording) ...[
+                    const SizedBox(height: 30),
+                    Text(t.deviceRecordingSaved, style: const TextStyle(fontSize: 14), textAlign: TextAlign.center),
                   ],
                   // the file path appears from the first recording, during "Saving to:", after "Last recording saved in:"
 

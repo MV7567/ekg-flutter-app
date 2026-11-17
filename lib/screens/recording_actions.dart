@@ -37,25 +37,10 @@ Future<void> shareRecording(BuildContext context, RecordingInfo recording) async
 // saves it in the file, returns the new note, null = cancelled or not saved
 Future<String?> editRecordingNote(BuildContext context, RecordingInfo recording, String currentNote) async {
   AppLocalizations t = AppLocalizations.of(context);
-  TextEditingController controller = TextEditingController(text: currentNote);
   String? note = await showDialog<String>(
     context: context,
-    builder: (context) => AlertDialog(
-      title: Text(t.noteDialogTitle),
-      content: TextField(
-        controller: controller,
-        autofocus: true,                                   // the keyboard opens at once
-        maxLength: CsvRecorder.maxNoteLength,              // a counter "12/80" under the field
-        decoration: InputDecoration(hintText: t.noteHint),
-        onSubmitted: (text) => Navigator.of(context).pop(text),   // Enter = save
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(t.commonCancel)),
-        TextButton(onPressed: () => Navigator.of(context).pop(controller.text), child: Text(t.commonSave)),
-      ],
-    ),
+    builder: (context) => NoteDialog(currentNote: currentNote),
   );
-  controller.dispose();
   if (note == null) return null;   // cancelled
   note = CsvRecorder.cleanNote(note);
   if (note == currentNote) return null;   // nothing changed, nothing to write
@@ -152,5 +137,46 @@ Future<bool> confirmAndDeleteRecording(BuildContext context, RecordingInfo recor
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.deleteError('$e')))); // show the error in the snackbar
     }
     return false;
+  }
+}
+
+// the note dialog owns its text controller and frees it in dispose(), i.e. only when the dialog
+// is really gone; freeing it right after showDialog() returned was too early: the closing
+// animation still draws the TextField and Flutter stopped with a red "_dependents.isEmpty" screen
+class NoteDialog extends StatefulWidget {
+  const NoteDialog({super.key, required this.currentNote});
+
+  final String currentNote;
+
+  @override
+  State<NoteDialog> createState() => _NoteDialogState();
+}
+
+class _NoteDialogState extends State<NoteDialog> {
+  late final TextEditingController _controller = TextEditingController(text: widget.currentNote);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    AppLocalizations t = AppLocalizations.of(context);
+    return AlertDialog(
+      title: Text(t.noteDialogTitle),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,                                   // the keyboard opens at once
+        maxLength: CsvRecorder.maxNoteLength,              // a counter "12/80" under the field
+        decoration: InputDecoration(hintText: t.noteHint),
+        onSubmitted: (text) => Navigator.of(context).pop(text),   // Enter = save
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(t.commonCancel)),
+        TextButton(onPressed: () => Navigator.of(context).pop(_controller.text), child: Text(t.commonSave)),
+      ],
+    );
   }
 }

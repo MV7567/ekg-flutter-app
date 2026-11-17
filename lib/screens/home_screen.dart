@@ -1,6 +1,6 @@
-import 'package:flutter/foundation.dart';   // kDebugMode
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
+import '../settings/app_settings.dart';   // advancedFeatures: the test signal button
 import 'device_screen.dart';
 import 'instructions_screen.dart';
 import 'recordings_screen.dart';
@@ -68,14 +68,20 @@ class HomeScreen extends StatelessWidget {
                   ),
 
                   // debug builds only, like the 🧪 in the scanner
-                  if (kDebugMode) ...[
-                    const SizedBox(height: 24),
-                    TextButton.icon(
-                      icon: const Icon(Icons.science),
-                      label: Text(t.homeTestSignal),
-                      onPressed: () => _open(context, const DeviceScreen.testSignal()),
-                    ),
-                  ],
+                  // ListenableBuilder: appears / disappears at once when the setting changes
+                  ListenableBuilder(
+                    listenable: AppSettings.instance,
+                    builder: (context, _) => !AppSettings.instance.advancedFeatures
+                        ? const SizedBox.shrink()
+                        : Padding(
+                            padding: const EdgeInsets.only(top: 24),
+                            child: TextButton.icon(
+                              icon: const Icon(Icons.science),
+                              label: Text(t.homeTestSignal),
+                              onPressed: () => _open(context, const DeviceScreen.testSignal()),
+                            ),
+                          ),
+                  ),
                 ],
               ),
             ),

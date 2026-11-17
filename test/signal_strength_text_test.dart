@@ -33,4 +33,17 @@ void main() {
     expect(find.text('Sygnał BLE: -91 dBm (słaby – przysuń telefon bliżej)'), findsOneWidget);
     expect(find.byIcon(Icons.signal_cellular_alt_1_bar), findsOneWidget);
   });
+
+  testWidgets('without the advanced features: only the bars and the level, no dBm', (tester) async {
+    ValueNotifier<int?> rssi = ValueNotifier(-62);
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      locale: const Locale('pl'),
+      home: Scaffold(body: Center(child: SignalStrengthText(rssi: rssi, showDbm: false))),
+    ));
+    expect(find.text('Sygnał BLE: silny'), findsOneWidget);
+    expect(find.textContaining('dBm'), findsNothing);
+    expect(find.byIcon(Icons.signal_cellular_alt), findsOneWidget);
+  });
 }

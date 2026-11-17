@@ -166,8 +166,10 @@ class _EkgPainter extends CustomPainter {
     _drawLabel(canvas, auto ? '$label · ${texts.chartZoomAuto}' : label);
   }
 
-  // a small red triangle at the bottom edge under every R wave, pointing up at it
-  // a blue vertical line over the whole height + a small flag at the top for every event
+  // a blue vertical line over the whole height + a small flag for every event
+  // the flag is below the scale label (top left), so the label never covers it
+  static const double _flagTop = 18;
+
   void _drawEventMarkers(Canvas canvas, Size size, double xStep) {
     List<int>? markers = eventMarkers?.value;
     if (markers == null || markers.isEmpty) return;
@@ -179,14 +181,15 @@ class _EkgPainter extends CustomPainter {
       double x = position * xStep;
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), line);
       Path triangle = Path()
-        ..moveTo(x, 0)
-        ..lineTo(x + 10, 5)
-        ..lineTo(x, 10)
+        ..moveTo(x, _flagTop)
+        ..lineTo(x + 10, _flagTop + 5)
+        ..lineTo(x, _flagTop + 10)
         ..close();
       canvas.drawPath(triangle, flag);
     }
   }
 
+  // a small red triangle at the bottom edge under every R wave, pointing up at it
   void _drawBeatMarkers(Canvas canvas, Size size, double xStep) {
     List<int>? markers = beatMarkers?.value;
     if (markers == null || markers.isEmpty) return;
@@ -244,6 +247,9 @@ class _EkgPainter extends CustomPainter {
       ),
       textDirection: TextDirection.ltr,
     )..layout();
+    // a background under the text: the signal or an event line under the label don't make it unreadable
+    canvas.drawRect(Rect.fromLTWH(2, 1, label.width + 4, label.height + 2),
+        Paint()..color = colors.background.withValues(alpha: 0.85));
     label.paint(canvas, const Offset(4, 2));
   }
   // in Canvas you cant just write text, TextPainter has to place it first (layout() calc the width of the letters and line breaks) and then draw it at point (4,2)

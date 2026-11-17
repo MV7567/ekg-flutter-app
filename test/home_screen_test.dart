@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import 'package:ecg_ble_app/l10n/app_localizations.dart';
 import 'package:ecg_ble_app/screens/home_screen.dart';
+import 'package:ecg_ble_app/settings/app_settings.dart';
 
 // the screen inside a MaterialApp with the translations, in the given language
 Widget app(Widget home, {Locale locale = const Locale('en')}) => MaterialApp(
@@ -12,6 +15,9 @@ Widget app(Widget home, {Locale locale = const Locale('en')}) => MaterialApp(
     );
 
 void main() {
+  // no phone in a test: the settings are "saved" in memory instead
+  SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.empty();
+
   // widget test: builds the screen in memory (no phone) and looks for the texts
   testWidgets('start screen shows the main buttons', (tester) async {
     await tester.pumpWidget(app(const HomeScreen()));
@@ -22,7 +28,22 @@ void main() {
     expect(find.text('Recordings'), findsOneWidget);
     expect(find.text('How to measure'), findsOneWidget);
     expect(find.text('Settings'), findsOneWidget);
-    expect(find.text('Test signal (debug)'), findsOneWidget);   // tests run in debug mode
+    expect(find.text('Test signal (debug)'), findsNothing);   // only with the advanced features
+  });
+
+  testWidgets('the test signal button follows the advanced features setting at once', (tester) async {
+    addTearDown(() => AppSettings.instance.setAdvancedFeatures(false));
+    await tester.pumpWidget(app(const HomeScreen()));
+    await tester.pumpAndSettle();
+    expect(find.text('Test signal (debug)'), findsNothing);
+
+    await AppSettings.instance.setAdvancedFeatures(true);   // like the switch in Settings
+    await tester.pump();
+    expect(find.text('Test signal (debug)'), findsOneWidget);
+
+    await AppSettings.instance.setAdvancedFeatures(false);
+    await tester.pump();
+    expect(find.text('Test signal (debug)'), findsNothing);
   });
 
   testWidgets('start screen in Polish', (tester) async {

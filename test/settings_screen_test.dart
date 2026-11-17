@@ -81,4 +81,28 @@ void main() {
     await tester.pumpAndSettle();
     expect(AppSettings.instance.beepOnBeat, isFalse);
   });
+
+  testWidgets('the advanced features switch: off by default, tapping turns it on and off', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: const SettingsScreen(),
+    ));
+    await tester.pumpAndSettle();
+
+    Finder advanced = find.text('Advanced features');
+    // the list builds only what is on the screen: scroll until the switch exists
+    await tester.scrollUntilVisible(advanced, 300, scrollable: find.byType(Scrollable).first);
+    await tester.pumpAndSettle();
+    expect(AppSettings.instance.advancedFeatures, isFalse);
+    await tester.tap(advanced);
+    await tester.pumpAndSettle();
+    expect(AppSettings.instance.advancedFeatures, isTrue);
+    await tester.tap(advanced);
+    await tester.pumpAndSettle();
+    expect(AppSettings.instance.advancedFeatures, isFalse);
+  });
 }

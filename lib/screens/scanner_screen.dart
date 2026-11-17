@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';                                             // Platform.isAndroid
 import 'package:device_info_plus/device_info_plus.dart';      // Android version
-import 'package:flutter/foundation.dart';                     // kDebugMode
 import 'package:flutter/material.dart';                       // import ui stuff
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';    // import bluetooth stuff
 import 'package:permission_handler/permission_handler.dart';  // import permission stuff
@@ -10,6 +9,7 @@ import '../l10n/app_localizations.dart';
 import 'device_screen.dart';
 import 'recordings_screen.dart';
 import 'settings_screen.dart';
+import '../settings/app_settings.dart';   // advancedFeatures: the test signal button
 
 // scanner, stateful widget, because we need to update the UI when scanning
 class ScannerScreen extends StatefulWidget {
@@ -45,6 +45,8 @@ class _ScannerScreenState extends State<ScannerScreen> {
   // before drawing the UI, request permissions and start listening to the scanner
   void initState() {
     super.initState();
+    // the test signal button follows the "advanced features" setting at once
+    AppSettings.instance.addListener(_onSettingsChanged);
     // flutter calls this method once, when the state is created, before the first build. 
     //It has to be first because the base class also has to initialize its state. 
     //mounted is true after initState and before dispose, it indicates if the widget is still in the widget tree, 
@@ -81,8 +83,13 @@ class _ScannerScreenState extends State<ScannerScreen> {
   }
 
 // cleaning
+  void _onSettingsChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
+    AppSettings.instance.removeListener(_onSettingsChanged);
     _scanResultsSubscription.cancel();
     _isScanningSubscription.cancel();
     FlutterBluePlus.stopScan();
@@ -177,7 +184,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
         title: Text(t.scannerTitle),
         actions: [      // actions is the icon spot on the right side of AppBar.
           // kDebugMode is a constant: false in a release build, so this button is not even compiled in
-          if (kDebugMode) // only true for flutter run, not flutter build apk --release
+          if (AppSettings.instance.advancedFeatures) // only true for flutter run, not flutter build apk --release
             IconButton(
               icon: const Icon(Icons.science),
               tooltip: t.homeTestSignal,

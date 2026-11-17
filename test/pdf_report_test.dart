@@ -37,6 +37,13 @@ void main() {
     expect(PdfReport.stripCount(0, fs), 0);
   });
 
+  test('strips start at 0:02, a recording shorter than 2 s + 1 strip from 0:00', () {
+    expect(PdfReport.firstStripSample(180 * fs, fs), 2 * fs);
+    expect(PdfReport.firstStripSample(8 * fs, fs), 2 * fs);       // exactly 2 s + 6 s
+    expect(PdfReport.firstStripSample(8 * fs - 1, fs), 0);
+    expect(PdfReport.firstStripSample(0, fs), 0);
+  });
+
   test('a whole report is a PDF, with and without statistics', () async {
     // the same fonts as the app, read straight from the files (no Flutter assets in a plain test)
     pw.Font regular = pw.Font.ttf(ByteData.sublistView(File('assets/fonts/Roboto-Regular.ttf').readAsBytesSync()));

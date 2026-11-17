@@ -20,6 +20,7 @@ class AppSettings extends ChangeNotifier {    // extends ChangeNotifier, works l
   static const String _paletteKey = 'palette';
   static const String _chartMatchesPaletteKey = 'chartMatchesPalette';
   static const String _beepOnBeatKey = 'beepOnBeat';
+  static const String _advancedFeaturesKey = 'advancedFeatures';
 
   final SharedPreferencesAsync _prefs = SharedPreferencesAsync();
 
@@ -37,6 +38,11 @@ class AppSettings extends ChangeNotifier {    // extends ChangeNotifier, works l
   // true = a short beep on every heart beat during a recording, off by default (it can be annoying)
   bool _beepOnBeat = false;
   bool get beepOnBeat => _beepOnBeat;
+
+  // true = technical details while measuring (samples, packets, dBm, file path)
+  // and the test signal buttons; off by default, a usual user doesn't need them
+  bool _advancedFeatures = false;
+  bool get advancedFeatures => _advancedFeatures;
 
   // app language as a code: "en", "pl", ..., "" = like the phone
   String _languageCode = '';
@@ -59,6 +65,7 @@ class AppSettings extends ChangeNotifier {    // extends ChangeNotifier, works l
       _palette = AppPalette.parse(await _prefs.getString(_paletteKey));
       _chartMatchesPalette = await _prefs.getBool(_chartMatchesPaletteKey) ?? false;   // ?? false: nothing saved yet
       _beepOnBeat = await _prefs.getBool(_beepOnBeatKey) ?? false;
+      _advancedFeatures = await _prefs.getBool(_advancedFeaturesKey) ?? false;
     } catch (e) {
       // storage not readable -> the defaults stay, the app still starts
       debugPrint("Settings load error: $e");
@@ -104,6 +111,17 @@ class AppSettings extends ChangeNotifier {    // extends ChangeNotifier, works l
     notifyListeners();
     try {
       await _prefs.setBool(_beepOnBeatKey, value);
+    } catch (e) {
+      debugPrint("Settings save error: $e");
+    }
+  }
+
+  Future<void> setAdvancedFeatures(bool value) async {
+    if (value == _advancedFeatures) return;
+    _advancedFeatures = value;
+    notifyListeners();   // the screens that show the advanced things redraw
+    try {
+      await _prefs.setBool(_advancedFeaturesKey, value);
     } catch (e) {
       debugPrint("Settings save error: $e");
     }
