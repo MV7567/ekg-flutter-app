@@ -18,6 +18,7 @@ class PdfReport {
   static const double stripSeconds = 6;        // 6 s x 25 mm/s = 150 mm, fits A4 with the margins
   static const double stripHeightMm = 30;      // 6 big squares
   static const int maxStrips = 10;             // 60 s of EKG, a 10 min recording would be 100 strips
+  static const int maxEventStrips = 10;        // one extra strip around every event, at most 10
 
   // the strips start at 0:02: in the first ~2 s after START the signal settles
   // (electrodes, input of the ADS1194: a step or a drift of 0.4..4 mV in real recordings),
@@ -66,6 +67,21 @@ class PdfReport {
   static int stripCount(int samples, int sampleRateHz) =>
       min(maxStrips, (samples / (stripSeconds * sampleRateHz)).ceil());
 
+  // where the extra strip of every event starts: the event in the middle (3 s before, 3 s after),
+  // moved inside the recording at its beginning / end
+  // events already on the main strips (stripsFrom..stripsEnd) get no extra strip, they are visible there
+  // returns (event, start) pairs, at most maxEventStrips
+  static List<(int event, int start)> eventStrips(
+      List<int> events, int samples, int sampleRateHz, int stripsFrom, int stripsEnd) {
+    int length = (stripSeconds * sampleRateHz).round();
+    if (samples < length) return [];   // shorter than one strip: the main strips show everything
+    return [
+      for (int event in events)
+        if (event < stripsFrom || event >= stripsEnd)
+          (event, (event - length ~/ 2).clamp(0, samples - length)),
+    ].take(maxEventStrips).toList();
+  }
+
   // the finished PDF file as bytes
   static Future<Uint8List> build({
     required AppLocalizations t,
@@ -87,6 +103,7 @@ class PdfReport {
     int samplesPerStrip = (stripSeconds * sampleRateHz).round();
     int strips = stripCount(millivolts.length - first, sampleRateHz);
     int stripsEnd = min(first + strips * samplesPerStrip, millivolts.length);
+    List<(int, int)> extra = eventStrips(events, millivolts.length, sampleRateHz, first, stripsEnd);
     Duration length = Duration(milliseconds: (millivolts.length * 1000 / sampleRateHz).round());
     // sample number -> "0:06" for the label above a strip
     String time(int sample) =>
@@ -163,6 +180,25 @@ class PdfReport {
                     '${time(min(first + (k + 1) * samplesPerStrip, millivolts.length))}',
                     style: const pw.TextStyle(fontSize: 8)),
                 _strip(millivolts, first + k * samplesPerStrip, samplesPerStrip, beats, events, gain, sampleRateHz),
+                pw.SizedBox(height: 3 * mm),
+              ],
+            ),
+          ),
+
+        // events after the first minute: a strip around each, the same paper and gain
+        if (extra.isNotEmpty) ...[
+          pw.SizedBox(height: 3 * mm),
+          pw.Text(t.reportEventStrips, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+          pw.SizedBox(height: 2 * mm),
+        ],
+        for (var (event, from) in extra)
+          pw.Inseparable(
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(t.reportEventStrip(time(event), time(from), time(from + samplesPerStrip)),
+                    style: const pw.TextStyle(fontSize: 8)),
+                _strip(millivolts, from, samplesPerStrip, beats, events, gain, sampleRateHz),
                 pw.SizedBox(height: 3 * mm),
               ],
             ),

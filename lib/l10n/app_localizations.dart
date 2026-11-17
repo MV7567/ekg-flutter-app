@@ -716,6 +716,18 @@ abstract class AppLocalizations {
   /// **'{from} – {to} of the recording, the first {skipped} s are left out (the signal settles after START).'**
   String reportStripsRange(String from, String to, int skipped);
 
+  /// No description provided for @reportEventStrips.
+  ///
+  /// In en, this message translates to:
+  /// **'Marked events'**
+  String get reportEventStrips;
+
+  /// No description provided for @reportEventStrip.
+  ///
+  /// In en, this message translates to:
+  /// **'Event at {time} ({from} – {to})'**
+  String reportEventStrip(String time, String from, String to);
+
   /// No description provided for @reportDisclaimer.
   ///
   /// In en, this message translates to:

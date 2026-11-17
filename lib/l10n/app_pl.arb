@@ -110,6 +110,8 @@
   "reportNote": "Notatka",
   "reportEkg": "EKG ({speed} mm/s, {gain} mm/mV, filtr 0,5–40 Hz)",
   "reportStripsRange": "{from} – {to} nagrania, pierwsze {skipped} s pominięte (sygnał ustala się po START).",
+  "reportEventStrips": "Zaznaczone zdarzenia",
+  "reportEventStrip": "Zdarzenie w {time} ({from} – {to})",
   "reportDisclaimer": "Wykonano w projekcie studenckim, to nie jest wyrób medyczny – nie służy do diagnozy.",
   "reportError": "Nie udało się utworzyć raportu: {error}",
   "statsNotEnoughBeats": "Za mało uderzeń serca do statystyk.",

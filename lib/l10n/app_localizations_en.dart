@@ -366,6 +366,14 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get reportEventStrips => 'Marked events';
+
+  @override
+  String reportEventStrip(String time, String from, String to) {
+    return 'Event at $time ($from – $to)';
+  }
+
+  @override
   String get reportDisclaimer =>
       'Made with a student project, not a medical device – not for diagnosis.';
 

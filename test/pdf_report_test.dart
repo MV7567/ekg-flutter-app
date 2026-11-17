@@ -44,6 +44,18 @@ void main() {
     expect(PdfReport.firstStripSample(0, fs), 0);
   });
 
+  test('event strips: event in the middle, only events after the main strips, at most 10', () {
+    int samples = 180 * fs;                  // 3 min
+    int from = 2 * fs, end = 62 * fs;        // the main strips 0:02 - 1:02
+    expect(PdfReport.eventStrips([30 * fs, 122 * fs], samples, fs, from, end),
+        [(122 * fs, 119 * fs)]);             // 0:30 is already on the main strips, 2:02 -> 1:59 - 2:05
+    expect(PdfReport.eventStrips([fs, 179 * fs], samples, fs, from, end),
+        [(fs, 0), (179 * fs, 174 * fs)]);    // at the edges the strip moves inside the recording
+    expect(PdfReport.eventStrips([for (int s = 70; s < 170; s += 5) s * fs], samples, fs, from, end).length,
+        PdfReport.maxEventStrips);
+    expect(PdfReport.eventStrips([fs], 5 * fs, fs, 0, 5 * fs), isEmpty);   // shorter than one strip
+  });
+
   test('a whole report is a PDF, with and without statistics', () async {
     // the same fonts as the app, read straight from the files (no Flutter assets in a plain test)
     pw.Font regular = pw.Font.ttf(ByteData.sublistView(File('assets/fonts/Roboto-Regular.ttf').readAsBytesSync()));
@@ -55,7 +67,7 @@ void main() {
     Uint8List full = await PdfReport.build(
       t: t, regular: regular, bold: bold,
       start: DateTime(2026, 11, 12, 16, 25), deviceName: 'ESP32_EKG', note: 'spoczynek, zażółć gęślą jaźń',
-      millivolts: mv, beats: beats, events: [5 * fs, 42 * fs], stats: RrStats.fromBeats(beats, fs), sampleRateHz: fs,
+      millivolts: mv, beats: beats, events: [5 * fs, 42 * fs, 66 * fs], stats: RrStats.fromBeats(beats, fs), sampleRateHz: fs,
     );
     expect(String.fromCharCodes(full.sublist(0, 5)), '%PDF-');
 

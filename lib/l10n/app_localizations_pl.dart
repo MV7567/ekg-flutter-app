@@ -367,6 +367,14 @@ class AppLocalizationsPl extends AppLocalizations {
   }
 
   @override
+  String get reportEventStrips => 'Zaznaczone zdarzenia';
+
+  @override
+  String reportEventStrip(String time, String from, String to) {
+    return 'Zdarzenie w $time ($from – $to)';
+  }
+
+  @override
   String get reportDisclaimer =>
       'Wykonano w projekcie studenckim, to nie jest wyrób medyczny – nie służy do diagnozy.';
 
