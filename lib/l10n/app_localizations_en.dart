@@ -257,6 +257,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get devicePreviewStop => 'STOP PREVIEW';
 
   @override
+  String get deviceAdsTest => 'ADS1194 test signal';
+
+  @override
+  String get deviceAdsTestHint =>
+      'The internal test signal of the ADS1194: a ±1 mV square wave, about 1 Hz, the electrodes are not measured. Nothing is saved, START records it.';
+
+  @override
   String get devicePreviewHint =>
       'Preview only, nothing is saved. START records from this moment on.';
 

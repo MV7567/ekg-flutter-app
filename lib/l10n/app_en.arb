@@ -88,6 +88,8 @@
   "deviceStart": "START",
   "devicePreview": "PREVIEW",
   "devicePreviewStop": "STOP PREVIEW",
+  "deviceAdsTest": "ADS1194 test signal",
+  "deviceAdsTestHint": "The internal test signal of the ADS1194: a ±1 mV square wave, about 1 Hz, the electrodes are not measured. Nothing is saved, START records it.",
   "devicePreviewHint": "Preview only, nothing is saved. START records from this moment on.",
   "deviceStop": "STOP",
   "deviceOfLength": "of {length}",

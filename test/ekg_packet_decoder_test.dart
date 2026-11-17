@@ -15,6 +15,17 @@ List<int> makePacket(int seq, List<int> values) {
 List<int> tenTimes(int v) => List.filled(samplesPerPacket, v);
 
 void main() {
+  test('the newer 22 byte packet: the flags byte is read, it is not a sample', () {
+    final decoder = EkgPacketDecoder();
+    final withFlags = decoder.decode([...makePacket(0, tenTimes(-2)), flagLeadOffP | flagTestSignal])!;
+    expect(withFlags.rawValues, tenTimes(-2));   // still 10 samples
+    expect(withFlags.flags, flagLeadOffP | flagTestSignal);
+    final old = decoder.decode(makePacket(1, tenTimes(5)))!;   // the old 21 bytes still work
+    expect(old.flags, 0);
+    expect((decoder.sampleCount, decoder.badPackets), (20, 0));
+    expect(decoder.decode([...makePacket(2, tenTimes(5)), 0, 0]), isNull);   // 23 bytes: wrong
+  });
+
   test('decodes positive and negative values', () {
     final decoder = EkgPacketDecoder();
     final packet = decoder.decode(

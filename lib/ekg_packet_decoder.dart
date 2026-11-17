@@ -2,13 +2,15 @@ import 'ekg_config.dart'; // no flutter or ble needed
 
 // samples from one BLE packet
 class EkgPacket {
-  EkgPacket(this.firstSampleIndex, this.rawValues); // constructor 
+  EkgPacket(this.firstSampleIndex, this.rawValues, [this.flags = 0]); // constructor 
 
   // number of the first sample in the whole recording (the others follow one by one)
   final int firstSampleIndex;
 
   // ADC values as signed 16-bit numbers, multiply by millivoltsPerLsb to get mV
   final List<int> rawValues;
+  // the flags byte of the newer firmware (lead-off, test signal), 0 for the old 21 byte packets
+  final int flags;
 }
 
 // turns the bytes of the BLE packets into samples and keeps track of lost packets
@@ -43,7 +45,7 @@ class EkgPacketDecoder {
 
   // returns the samples of the packet, or null if the packet is skipped (wrong length or duplicate)
   EkgPacket? decode(List<int> data) {
-    if (data.length != packetLength) {
+    if (data.length != packetLength && data.length != packetLengthWithFlags) {
       _badPackets++;
       _lastBadLength = data.length;
       return null;
@@ -69,7 +71,7 @@ class EkgPacketDecoder {
     _expectedSeq = (seq + 1) & 0xFF;  // next expected number, after 255 we expect 0 not 256
 
     List<int> rawValues = [];
-    for (int i = 1; i < data.length; i += 2) {    // loop starts from 1 because 0 is the packet number and increments by 2 beause each sample is 2 bytes
+    for (int i = 1; i < packetLength; i += 2) {   // up to the samples' end, not into the flags byte    // loop starts from 1 because 0 is the packet number and increments by 2 beause each sample is 2 bytes
       // combine the two bytes into a single 16-bit integer
       int value = (data[i] << 8) | data[i + 1];   // firmware sends big endian first, shift 8 bits left, then OR with the next byte
 
@@ -83,7 +85,8 @@ class EkgPacketDecoder {
     }
     // after sticking the bytes together dart sees a normal number because int has 64 bits, and doesnt know it was meant to be a 16-bit signed int so we have to do the conversion manually
 
-    EkgPacket packet = EkgPacket(_sampleIndex, rawValues);
+    int flags = data.length == packetLengthWithFlags ? data[packetLength] : 0;
+    EkgPacket packet = EkgPacket(_sampleIndex, rawValues, flags);
     _sampleIndex += samplesPerPacket;
     return packet;
   }

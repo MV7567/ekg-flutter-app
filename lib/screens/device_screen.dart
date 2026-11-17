@@ -68,6 +68,12 @@ class _DeviceScreenState extends State<DeviceScreen> {
   // preview: the ESP32 measures and the chart, heart rate and signal quality work,
   // but nothing is written to a file (checking the electrodes before START)
   bool _isPreviewing = false;
+  // the preview measures the internal test signal of the ADS1194, not the electrodes (advanced features)
+  bool _isAdsTest = false;
+  // packets with an electrode off (the lead-off bits of the firmware), and all packets, of this recording:
+  // mostly off = no average heart rate in the file (it would be counted from noise)
+  int _leadOffPackets = 0;
+  int _recordedPackets = 0;
   // _isRecording says whether there is a recording in progress, whether the packets end up in the file and which label is on the button depend on this
   // _isBusy is set during sending the start/stop command, the button is turned off then
 
@@ -345,6 +351,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
       _heartRate.reset();     // it counts in sample numbers, they start again from 0
       _recordingBeats.clear();
       _eventCount = 0;
+      _leadOffPackets = 0;
+      _recordedPackets = 0;
       _bpm.value = null;
       _isPreviewing = false;
       _isRecording = true;
@@ -361,6 +369,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
     _resetSignalProcessing();
     _recordingBeats.clear();
     _eventCount = 0;
+    _leadOffPackets = 0;
+    _recordedPackets = 0;
     _isRecording = true;   // set before the command, so the first packet is not ignored
     // the screen doesn't go dark during the recording, otherwise the person reaches for the phone
     // and moves the electrodes / cables (= artifacts), every end of a recording turns it back off
@@ -422,17 +432,19 @@ class _DeviceScreenState extends State<DeviceScreen> {
   
 
   // the same as START, but without a file
-  Future<void> _startPreview() async {
+  // adsTest: the ESP32 measures the internal test signal of the ADS1194 instead of the electrodes
+  Future<void> _startPreview({bool adsTest = false}) async {
     if (_controlCharacteristic == null && !_isTestSignal) return;
     setState(() => _isBusy = true);
     _resetSignalProcessing();
     _isPreviewing = true;   // before the command, so the first packet is not ignored
+    _isAdsTest = adsTest;
     _setKeepScreenOn(true);
     try {
       if (_testSignal != null) {
         _testSignal.start();
       } else {
-        await _controlCharacteristic!.write([controlStart]);
+        await _controlCharacteristic!.write([adsTest ? controlStartTest : controlStart]);
       }
     } catch (e) {
       debugPrint("Preview start error: $e");
@@ -457,6 +469,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
   // packets arriving after this are ignored (like after _finishRecording)
   void _endPreview() {
     _isPreviewing = false;
+    _isAdsTest = false;
     _setKeepScreenOn(false);
     if (mounted) setState(() {});
   }
@@ -489,6 +502,13 @@ class _DeviceScreenState extends State<DeviceScreen> {
     _showMessage((t) => t.deviceEventSaved(DeviceScreen.durationLabel(sample ~/ sampleRateHz)));
   }
 
+  // the average heart rate for the footer, null if the electrodes were off for more than half
+  // of the recording (the firmware reports it), otherwise noise would give e.g. "143 bpm"
+  int? _averageBpmForFile() {
+    if (_recordedPackets > 0 && _leadOffPackets * 2 > _recordedPackets) return null;
+    return HeartRateDetector.averageBpm(_recordingBeats, sampleRateHz);
+  }
+
   // stops writing and closes the file, packets arriving after this are ignored
   // returns false if the file could not be written completely
   Future<bool> _finishRecording() async {
@@ -500,7 +520,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
     // writes the rest, closes the file and registers it in the file manager
     // the footer gets the average heart rate and the note
     bool saved = await _recorder.close(
-        averageBpm: HeartRateDetector.averageBpm(_recordingBeats, sampleRateHz), note: _noteController.text);
+        averageBpm: _averageBpmForFile(), note: _noteController.text);
     if (!saved) _showMessage((t) => t.deviceIncomplete);
 
     if (mounted) setState(() {});
@@ -568,6 +588,13 @@ class _DeviceScreenState extends State<DeviceScreen> {
     int lastSample = packet.firstSampleIndex + packet.rawValues.length - 1;
     _quality.value = _qualityMonitor.update(lastBeat == null ? null : lastSample - lastBeat,
         rhythmSteady: _heartRate.rhythmSteady);
+    // the hardware lead-off detection of the firmware is surer than the guess from the samples
+    bool leadOff = packet.flags & (flagLeadOffP | flagLeadOffN) != 0;
+    if (leadOff) _quality.value = SignalQuality.electrodeOff;
+    if (toFile) {
+      _recordedPackets++;
+      if (leadOff) _leadOffPackets++;
+    }
 
     // the chosen length is reached -> stop like the STOP button,
     // !_isBusy: the next packets arrive while stopping, stop only once
@@ -655,7 +682,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
     _isRecording = false;
     _setKeepScreenOn(false);
     _recorder.close(
-        averageBpm: HeartRateDetector.averageBpm(_recordingBeats, sampleRateHz), note: _noteController.text);
+        averageBpm: _averageBpmForFile(), note: _noteController.text);
     // 3. Disconnect the device (the ESP32 stops the measurement when the phone disconnects)
     // catchError: an error here (e.g. already disconnected) is only printed, not "Unhandled exception"
     widget.device?.disconnect().catchError((e) => debugPrint("Disconnect error: $e"));
@@ -839,13 +866,20 @@ class _DeviceScreenState extends State<DeviceScreen> {
                       icon: Icon(_isPreviewing ? Icons.visibility_off : Icons.visibility),
                       label: Text(_isPreviewing ? t.devicePreviewStop : t.devicePreview),
                     ),
+                    // advanced: the internal test signal of the ADS1194 (only with the real device)
+                    if (!_isPreviewing && !_isTestSignal && AppSettings.instance.advancedFeatures)
+                      TextButton.icon(
+                        onPressed: _isBusy ? null : () => _startPreview(adsTest: true),
+                        icon: const Icon(Icons.science),
+                        label: Text(t.deviceAdsTest),
+                      ),
                     if (_isPreviewing) ...[
                       const SizedBox(height: 10),
                       HeartRateText(bpm: _bpm, beats: _beatCount, fontSize: 28),
                       const SizedBox(height: 6),
                       SignalQualityText(quality: _quality),
                       const SizedBox(height: 6),
-                      Text(t.devicePreviewHint, textAlign: TextAlign.center,
+                      Text(_isAdsTest ? t.deviceAdsTestHint : t.devicePreviewHint, textAlign: TextAlign.center,
                           style: const TextStyle(fontSize: 13, color: Colors.grey)),
                     ],
                   ],

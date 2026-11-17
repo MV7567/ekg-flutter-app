@@ -82,6 +82,8 @@
   "deviceStart": "START",
   "devicePreview": "PODGLĄD",
   "devicePreviewStop": "ZATRZYMAJ PODGLĄD",
+  "deviceAdsTest": "Sygnał testowy ADS1194",
+  "deviceAdsTestHint": "Wewnętrzny sygnał testowy ADS1194: prostokąt ±1 mV, ok. 1 Hz, elektrody nie są mierzone. Nic nie jest zapisywane, START go nagra.",
   "devicePreviewHint": "Tylko podgląd, nic nie jest zapisywane. START nagrywa od tej chwili.",
   "deviceStop": "STOP",
   "deviceOfLength": "z {length}",

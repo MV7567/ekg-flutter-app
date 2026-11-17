@@ -554,6 +554,18 @@ abstract class AppLocalizations {
   /// **'STOP PREVIEW'**
   String get devicePreviewStop;
 
+  /// No description provided for @deviceAdsTest.
+  ///
+  /// In en, this message translates to:
+  /// **'ADS1194 test signal'**
+  String get deviceAdsTest;
+
+  /// No description provided for @deviceAdsTestHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The internal test signal of the ADS1194: a ±1 mV square wave, about 1 Hz, the electrodes are not measured. Nothing is saved, START records it.'**
+  String get deviceAdsTestHint;
+
   /// No description provided for @devicePreviewHint.
   ///
   /// In en, this message translates to:

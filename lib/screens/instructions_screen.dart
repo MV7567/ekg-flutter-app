@@ -190,12 +190,14 @@ class _ElectrodeMapPainter extends CustomPainter {
 
     // electrodes: the person's right is on the left of the picture
     // every dot in the color of its lead on the cable
-    _electrode(canvas, Offset(cx - w * 0.15, h * 0.29), 'RA', InstructionsScreen.rightArmColor, labelLeft: true);
-    _electrode(canvas, Offset(cx + w * 0.15, h * 0.29), 'LA', InstructionsScreen.leftArmColor, labelLeft: false);
-    _electrode(canvas, Offset(cx + w * 0.13, h * 0.58), 'LL', InstructionsScreen.leftLegColor, labelLeft: false);
+    // the labels inside the body, so they never cross the lines of the arms or the torso:
+    // RA / LA under their dot, LL (near the bottom edge) to the left of it
+    _electrode(canvas, Offset(cx - w * 0.15, h * 0.29), 'RA', InstructionsScreen.rightArmColor, labelBelow: true);
+    _electrode(canvas, Offset(cx + w * 0.15, h * 0.29), 'LA', InstructionsScreen.leftArmColor, labelBelow: true);
+    _electrode(canvas, Offset(cx + w * 0.13, h * 0.58), 'LL', InstructionsScreen.leftLegColor, labelBelow: false);
   }
 
-  void _electrode(Canvas canvas, Offset at, String label, Color color, {required bool labelLeft}) {
+  void _electrode(Canvas canvas, Offset at, String label, Color color, {required bool labelBelow}) {
     canvas.drawCircle(at, 7, Paint()..color = color);
     // a thin ring, so the yellow dot is visible on a light background too
     canvas.drawCircle(at, 7, Paint()
@@ -206,9 +208,11 @@ class _ElectrodeMapPainter extends CustomPainter {
       text: TextSpan(text: label, style: TextStyle(color: textColor, fontSize: 13, fontWeight: FontWeight.bold)),
       textDirection: TextDirection.ltr,
     )..layout();
-    // the label next to the dot, outside the body when possible
-    double x = labelLeft ? at.dx - 12 - text.width : at.dx + 12;
-    text.paint(canvas, Offset(x, at.dy - text.height / 2));
+    // under the dot (centered), or to the left of it
+    Offset where = labelBelow
+        ? Offset(at.dx - text.width / 2, at.dy + 10)
+        : Offset(at.dx - 12 - text.width, at.dy - text.height / 2);
+    text.paint(canvas, where);
   }
 
   @override

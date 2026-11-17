@@ -258,6 +258,13 @@ class AppLocalizationsPl extends AppLocalizations {
   String get devicePreviewStop => 'ZATRZYMAJ PODGLĄD';
 
   @override
+  String get deviceAdsTest => 'Sygnał testowy ADS1194';
+
+  @override
+  String get deviceAdsTestHint =>
+      'Wewnętrzny sygnał testowy ADS1194: prostokąt ±1 mV, ok. 1 Hz, elektrody nie są mierzone. Nic nie jest zapisywane, START go nagra.';
+
+  @override
   String get devicePreviewHint =>
       'Tylko podgląd, nic nie jest zapisywane. START nagrywa od tej chwili.';
 

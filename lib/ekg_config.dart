@@ -14,6 +14,9 @@ final Guid ekgControlCharacteristicUuid = Guid("beb5483f-36e1-4688-b7f5-ea07361b
 // commands written to the control characteristic
 const int controlStop = 0x00;
 const int controlStart = 0x01;
+// start with the internal test signal of the ADS1194 (a +-1 mV square, ~1 Hz) instead of the electrodes
+// (an older firmware ignores it, nothing starts)
+const int controlStartTest = 0x02;
 // byte written to the control characteristic, hex values, the same values are used in the firmware as CONTROL_STOP and CONTROL_START
 
 // one BLE packet = 1 byte sequence number (0..255) + 10 samples x 2 bytes (int16, high byte first)
@@ -21,6 +24,12 @@ const int samplesPerPacket = 10;
 const int packetLength = 1 + samplesPerPacket * 2;
 // a packet has 1 byte sequence number and 10 samples, each 2 bytes, together 21 bytes. 
 // packetLength is calculated so if the samples number is changed the length will also change.
+
+// the newer firmware adds 1 byte of flags at the end (22 bytes), both lengths are accepted
+const int packetLengthWithFlags = packetLength + 1;
+const int flagLeadOffP = 0x01;     // the electrode on CH1+ was off during this packet
+const int flagLeadOffN = 0x02;     // the electrode on CH1- was off during this packet
+const int flagTestSignal = 0x80;   // the packet is the internal test signal, not the electrodes
 
 // ADS1194 CONFIG1 = 0x05 -> 250 samples per second
 const int sampleRateHz = 250;
