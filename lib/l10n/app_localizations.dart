@@ -740,6 +740,24 @@ abstract class AppLocalizations {
   /// **'Marked events'**
   String get reportEventStrips;
 
+  /// No description provided for @reportArtifactStrips.
+  ///
+  /// In en, this message translates to:
+  /// **'Disturbances found by the app'**
+  String get reportArtifactStrips;
+
+  /// No description provided for @reportArtifactStrip.
+  ///
+  /// In en, this message translates to:
+  /// **'Disturbance at {label} ({from} – {to})'**
+  String reportArtifactStrip(String label, String from, String to);
+
+  /// No description provided for @viewArtifacts.
+  ///
+  /// In en, this message translates to:
+  /// **'Disturbances:'**
+  String get viewArtifacts;
+
   /// No description provided for @reportEventStrip.
   ///
   /// In en, this message translates to:
@@ -941,8 +959,26 @@ abstract class AppLocalizations {
   /// No description provided for @instrElectrodesIntro.
   ///
   /// In en, this message translates to:
-  /// **'Three electrodes, the cable labels say which one is which:'**
+  /// **'Three electrodes, the colors are the ones of the cable in this kit:'**
   String get instrElectrodesIntro;
+
+  /// No description provided for @instrCableRightArm.
+  ///
+  /// In en, this message translates to:
+  /// **'green lead, marked R'**
+  String get instrCableRightArm;
+
+  /// No description provided for @instrCableLeftArm.
+  ///
+  /// In en, this message translates to:
+  /// **'red lead, no letter'**
+  String get instrCableLeftArm;
+
+  /// No description provided for @instrCableLeftLeg.
+  ///
+  /// In en, this message translates to:
+  /// **'yellow lead, marked L'**
+  String get instrCableLeftLeg;
 
   /// No description provided for @instrRightArm.
   ///
@@ -1031,7 +1067,7 @@ abstract class AppLocalizations {
   /// No description provided for @instrDuring3.
   ///
   /// In en, this message translates to:
-  /// **'Wait about 10 s after pressing START, the line needs a moment to settle.'**
+  /// **'First turn on PREVIEW and wait until the line is calm (about 10 s), only then press START.'**
   String get instrDuring3;
 
   /// No description provided for @instrDuring4.

@@ -34,6 +34,15 @@ void main() {
     expect(find.text('RA'), findsOneWidget);
     expect(find.text('LA'), findsOneWidget);
     expect(find.text('LL'), findsOneWidget);
+    // the leads of the kit's cable, under every electrode (the screen is in Polish)
+    expect(find.text('zielony przewód, napis R'), findsOneWidget);
+    expect(find.text('czerwony przewód, bez napisu'), findsOneWidget);
+    expect(find.text('żółty przewód, napis L'), findsOneWidget);
+  });
+
+  test('readable letters on every lead color', () {
+    expect(InstructionsScreen.textOn(InstructionsScreen.leftLegColor), Colors.black);   // on yellow
+    expect(InstructionsScreen.textOn(InstructionsScreen.leftArmColor), Colors.white);   // on red
   });
 
   testWidgets('instructions fit in landscape, dark, Polish', (tester) async {

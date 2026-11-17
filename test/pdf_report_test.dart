@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:ecg_ble_app/artifact_detector.dart';
 import 'package:ecg_ble_app/ekg_test_signal.dart';
 import 'package:ecg_ble_app/filters/biquad_filter.dart';
 import 'package:ecg_ble_app/heart_rate_detector.dart';
@@ -67,7 +68,8 @@ void main() {
     Uint8List full = await PdfReport.build(
       t: t, regular: regular, bold: bold,
       start: DateTime(2026, 11, 12, 16, 25), deviceName: 'ESP32_EKG', note: 'spoczynek, zażółć gęślą jaźń',
-      millivolts: mv, beats: beats, events: [5 * fs, 42 * fs, 66 * fs], stats: RrStats.fromBeats(beats, fs), sampleRateHz: fs,
+      millivolts: mv, beats: beats, events: [5 * fs, 42 * fs, 66 * fs],
+      artifacts: [Artifact(20 * fs, 22 * fs), Artifact(65 * fs, 66 * fs)], stats: RrStats.fromBeats(beats, fs), sampleRateHz: fs,
     );
     expect(String.fromCharCodes(full.sublist(0, 5)), '%PDF-');
 

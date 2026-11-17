@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';   // the Android share sheet
 import '../ekg_config.dart';                   // sampleRateHz
 import '../recording/pdf_report.dart';
 import '../rr_stats.dart';
+import '../artifact_detector.dart';            // Artifact
 import '../recording/csv_recorder.dart';       // updateMediaStore
 import '../recording/recording_file.dart';
 import '../l10n/app_localizations.dart';
@@ -67,6 +68,7 @@ Future<void> shareReport(
   required Float32List millivolts,
   required List<int> beats,
   required List<int> events,
+  List<Artifact> artifacts = const [],
   required RrStats? stats,
 }) async {
   AppLocalizations t = AppLocalizations.of(context);
@@ -84,6 +86,7 @@ Future<void> shareReport(
       millivolts: millivolts,
       beats: beats,
       events: events,
+      artifacts: artifacts,
       stats: stats,
       sampleRateHz: sampleRateHz,
     );

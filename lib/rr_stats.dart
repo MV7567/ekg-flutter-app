@@ -1,4 +1,5 @@
 import 'dart:math';   // sqrt, min, max
+import 'artifact_detector.dart';   // Artifact
 
 // one point of the tachogram: when the interval ended and how long it was
 class RrPoint {
@@ -47,21 +48,27 @@ class RrStats {
   static const int _minIntervals = 3;
 
   // null = fewer than 3 normal intervals, nothing to show
-  static RrStats? fromBeats(List<int> beats, int sampleRateHz) {
+  // artifacts: an interval with a beat inside a disturbed part is not normal either
+  // (a cough can make a "beat" or hide one, the interval would be wrong)
+  static RrStats? fromBeats(List<int> beats, int sampleRateHz, {List<Artifact> artifacts = const []}) {
     if (beats.length < 2) return null;
 
     // 1. every interval, and which of them are normal
     List<int> intervals = [for (int k = 1; k < beats.length; k++) beats[k] - beats[k - 1]];
+    bool disturbed(int sample) => artifacts.any((a) => a.contains(sample));
+    // interval k is between beats k and k + 1
+    List<bool> clean = [for (int k = 0; k < intervals.length; k++) !disturbed(beats[k]) && !disturbed(beats[k + 1])];
     List<int> believable = intervals
         .where((rr) => rr >= _minRrSeconds * sampleRateHz && rr <= _maxRrSeconds * sampleRateHz)
         .toList();
     if (believable.length < _minIntervals) return null;
     List<int> sorted = List.of(believable)..sort();
     int median = sorted[sorted.length ~/ 2];
-    bool isNormal(int rr) =>
-        rr >= _minRrSeconds * sampleRateHz &&
-        rr <= _maxRrSeconds * sampleRateHz &&
-        (rr - median).abs() <= _maxDeviation * median;
+    bool isNormal(int k) =>
+        clean[k] &&
+        intervals[k] >= _minRrSeconds * sampleRateHz &&
+        intervals[k] <= _maxRrSeconds * sampleRateHz &&
+        (intervals[k] - median).abs() <= _maxDeviation * median;
 
     // 2. the normal intervals in ms, with their time, and the beat-to-beat differences
     double msPerSample = 1000 / sampleRateHz;
@@ -69,11 +76,11 @@ class RrStats {
     List<RrPoint> points = [];
     List<double> differences = [];   // only between two NEIGHBOUR normal intervals
     for (int k = 0; k < intervals.length; k++) {
-      if (!isNormal(intervals[k])) continue;
+      if (!isNormal(k)) continue;
       double rrMs = intervals[k] * msPerSample;
       // the previous interval in the recording must be normal too, otherwise the
       // difference would jump over a gap (a missed beat) and be meaningless
-      if (k > 0 && isNormal(intervals[k - 1])) {
+      if (k > 0 && isNormal(k - 1)) {
         differences.add(rrMs - intervals[k - 1] * msPerSample);
       }
       nn.add(rrMs);

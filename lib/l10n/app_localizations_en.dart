@@ -379,6 +379,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reportEventStrips => 'Marked events';
 
   @override
+  String get reportArtifactStrips => 'Disturbances found by the app';
+
+  @override
+  String reportArtifactStrip(String label, String from, String to) {
+    return 'Disturbance at $label ($from – $to)';
+  }
+
+  @override
+  String get viewArtifacts => 'Disturbances:';
+
+  @override
   String reportEventStrip(String time, String from, String to) {
     return 'Event at $time ($from – $to)';
   }
@@ -506,7 +517,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get instrElectrodesIntro =>
-      'Three electrodes, the cable labels say which one is which:';
+      'Three electrodes, the colors are the ones of the cable in this kit:';
+
+  @override
+  String get instrCableRightArm => 'green lead, marked R';
+
+  @override
+  String get instrCableLeftArm => 'red lead, no letter';
+
+  @override
+  String get instrCableLeftLeg => 'yellow lead, marked L';
 
   @override
   String get instrRightArm => 'Right arm';
@@ -559,7 +579,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get instrDuring3 =>
-      'Wait about 10 s after pressing START, the line needs a moment to settle.';
+      'First turn on PREVIEW and wait until the line is calm (about 10 s), only then press START.';
 
   @override
   String get instrDuring4 =>

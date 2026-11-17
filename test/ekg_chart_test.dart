@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ecg_ble_app/artifact_detector.dart';
 import 'package:ecg_ble_app/ekg_buffer.dart';
 import 'package:ecg_ble_app/l10n/app_localizations.dart';
 import 'package:ecg_ble_app/widgets/ekg_chart.dart';
@@ -59,15 +60,19 @@ void main() {
     EkgBuffer buffer = EkgBuffer(1250)..addAll(List.filled(1250, 0.5));
     ValueNotifier<List<int>> beats = ValueNotifier([100, 300]);
     ValueNotifier<List<int>> events = ValueNotifier([200]);
+    // a disturbance that started before the window (no flag) and one inside it
+    ValueNotifier<List<Artifact>> artifacts = ValueNotifier([const Artifact(-100, 50), const Artifact(600, 900)]);
     addTearDown(buffer.dispose);
     await tester.pumpWidget(MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      home: EkgChart(buffer: buffer, sampleRateHz: 250, beatMarkers: beats, eventMarkers: events),
+      home: EkgChart(buffer: buffer, sampleRateHz: 250, beatMarkers: beats, eventMarkers: events,
+          artifactMarkers: artifacts),
     ));
     events.value = [50, 1249];   // moving the window: new positions, the chart repaints by itself
     await tester.pump();
     events.value = [];
+    artifacts.value = [const Artifact(1200, 1400)];   // goes on after the window
     await tester.pump();
     expect(tester.takeException(), isNull);
   });

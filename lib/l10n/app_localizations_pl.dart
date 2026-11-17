@@ -380,6 +380,17 @@ class AppLocalizationsPl extends AppLocalizations {
   String get reportEventStrips => 'Zaznaczone zdarzenia';
 
   @override
+  String get reportArtifactStrips => 'Zakłócenia wykryte przez aplikację';
+
+  @override
+  String reportArtifactStrip(String label, String from, String to) {
+    return 'Zakłócenie w $label ($from – $to)';
+  }
+
+  @override
+  String get viewArtifacts => 'Zakłócenia:';
+
+  @override
   String reportEventStrip(String time, String from, String to) {
     return 'Zdarzenie w $time ($from – $to)';
   }
@@ -507,7 +518,16 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get instrElectrodesIntro =>
-      'Trzy elektrody, napisy na kablu mówią, która jest która:';
+      'Trzy elektrody, kolory takie jak na kablu z zestawu:';
+
+  @override
+  String get instrCableRightArm => 'zielony przewód, napis R';
+
+  @override
+  String get instrCableLeftArm => 'czerwony przewód, bez napisu';
+
+  @override
+  String get instrCableLeftLeg => 'żółty przewód, napis L';
 
   @override
   String get instrRightArm => 'Prawa ręka';
@@ -561,7 +581,7 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get instrDuring3 =>
-      'Po naciśnięciu START odczekaj ok. 10 s, linia potrzebuje chwili, żeby się ustabilizować.';
+      'Najpierw włącz PODGLĄD i poczekaj, aż linia się uspokoi (ok. 10 s), dopiero potem naciśnij START.';
 
   @override
   String get instrDuring4 =>

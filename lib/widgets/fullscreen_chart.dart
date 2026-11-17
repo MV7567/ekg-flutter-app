@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';   // ValueListenable
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';   // SystemChrome: orientation and system bars
+import '../artifact_detector.dart';   // Artifact
 import '../ekg_buffer.dart';
 import '../l10n/app_localizations.dart';
 import 'ekg_chart.dart';
@@ -21,6 +22,7 @@ class FullscreenChartScreen extends StatefulWidget {
     this.beats,
     this.beatMarkers,
     this.eventMarkers,
+    this.artifactMarkers,
   });
 
   final EkgBuffer buffer;
@@ -36,6 +38,8 @@ class FullscreenChartScreen extends StatefulWidget {
   final ValueListenable<List<int>>? beatMarkers;
   // only recordings: the marked events (see EkgChart)
   final ValueListenable<List<int>>? eventMarkers;
+  // only recordings: the disturbed parts (see EkgChart)
+  final ValueListenable<List<Artifact>>? artifactMarkers;
 
   // opens the screen, returns the zoom chosen there, so the screen below can take it over
   static Future<double?> open(
@@ -48,6 +52,7 @@ class FullscreenChartScreen extends StatefulWidget {
     Listenable? beats,
     ValueListenable<List<int>>? beatMarkers,
     ValueListenable<List<int>>? eventMarkers,
+    ValueListenable<List<Artifact>>? artifactMarkers,
   }) {
     return Navigator.of(context).push<double>(MaterialPageRoute(
       builder: (context) => FullscreenChartScreen(
@@ -59,6 +64,7 @@ class FullscreenChartScreen extends StatefulWidget {
         beats: beats,
         beatMarkers: beatMarkers,
         eventMarkers: eventMarkers,
+        artifactMarkers: artifactMarkers,
       ),
     ));
   }
@@ -121,6 +127,7 @@ class _FullscreenChartScreenState extends State<FullscreenChartScreen> {
                       mvPerBigSquare: _mvPerBigSquare,
                       beatMarkers: widget.beatMarkers,
                       eventMarkers: widget.eventMarkers,
+                      artifactMarkers: widget.artifactMarkers,
                     ),
                   ),
                 ),

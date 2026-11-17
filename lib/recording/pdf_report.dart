@@ -4,6 +4,7 @@ import 'package:pdf/pdf.dart';          // PdfPageFormat, PdfColor, PdfGraphics
 import 'package:pdf/widgets.dart' as pw; // "pw." so its Text, Row... don't mix with Flutter's
 import '../l10n/app_localizations.dart';
 import '../rr_stats.dart';
+import '../artifact_detector.dart';           // Artifact, artifactLabel
 import '../screens/recordings_screen.dart';   // formatStart, formatDuration
 import '../widgets/rr_tachogram.dart';        // the range of the tachogram
 
@@ -33,6 +34,8 @@ class PdfReport {
   static const PdfColor _smallGrid = PdfColor.fromInt(0xFFF8C8C8);
   static const PdfColor _bigGrid = PdfColor.fromInt(0xFFE88A8A);
   static const PdfColor _eventColor = PdfColor.fromInt(0xFF1E88E5);   // the same blue as in the app
+  static const PdfColor _artifactBand = PdfColor.fromInt(0xFFFFE0B2);  // light orange under the grid
+  static const PdfColor _artifactColor = PdfColor.fromInt(0xFFFB8C00); // the same orange as in the app
 
   // the biggest gain where the usual beats take at most 70 % of the half height of a strip
   // usual = the median of the highest |value| of every second (one artifact doesn't count)
@@ -93,6 +96,7 @@ class PdfReport {
     required Float32List millivolts,   // filtered, like on the screen
     required List<int> beats,          // sample numbers of the R waves
     List<int> events = const [],       // sample numbers of the marked events
+    List<Artifact> artifacts = const [],   // disturbed parts found automatically
     required RrStats? stats,
     required int sampleRateHz,
   }) async {
@@ -104,6 +108,15 @@ class PdfReport {
     int strips = stripCount(millivolts.length - first, sampleRateHz);
     int stripsEnd = min(first + strips * samplesPerStrip, millivolts.length);
     List<(int, int)> extra = eventStrips(events, millivolts.length, sampleRateHz, first, stripsEnd);
+    // the disturbances get a strip too (around their middle), in the places that are left,
+    // but not one that is already whole on an event strip (a cough right after the event button)
+    bool onEventStrip(Artifact a) => extra.any((e) => a.start >= e.$2 && a.end <= e.$2 + samplesPerStrip);
+    List<Artifact> notShown = [for (Artifact a in artifacts) if (!onEventStrip(a)) a];
+    List<(Artifact, int)> artifactExtra = [
+      for (var (middle, from) in eventStrips([for (Artifact a in notShown) (a.start + a.end) ~/ 2],
+          millivolts.length, sampleRateHz, first, stripsEnd))
+        (notShown.firstWhere((a) => (a.start + a.end) ~/ 2 == middle), from),
+    ].take(maxEventStrips - extra.length).toList();
     Duration length = Duration(milliseconds: (millivolts.length * 1000 / sampleRateHz).round());
     // sample number -> "0:06" for the label above a strip
     String time(int sample) =>
@@ -129,6 +142,8 @@ class PdfReport {
         if (deviceName.isNotEmpty) _info(t.reportDevice, deviceName),
         if (note.isNotEmpty) _info(t.reportNote, note),
         if (events.isNotEmpty) _info(t.viewEvents, events.map(time).join(', ')),
+        if (artifacts.isNotEmpty)
+          _info(t.viewArtifacts, artifacts.map((a) => artifactLabel(a, sampleRateHz)).join(', ')),
         pw.SizedBox(height: 6 * mm),
 
         // statistics, the same values as on the recording screen
@@ -179,7 +194,8 @@ class PdfReport {
                 pw.Text('${time(first + k * samplesPerStrip)} – '
                     '${time(min(first + (k + 1) * samplesPerStrip, millivolts.length))}',
                     style: const pw.TextStyle(fontSize: 8)),
-                _strip(millivolts, first + k * samplesPerStrip, samplesPerStrip, beats, events, gain, sampleRateHz),
+                _strip(millivolts, first + k * samplesPerStrip, samplesPerStrip, beats, events, artifacts, gain,
+                    sampleRateHz),
                 pw.SizedBox(height: 3 * mm),
               ],
             ),
@@ -199,7 +215,26 @@ class PdfReport {
                 ],
                 pw.Text(t.reportEventStrip(time(event), time(from), time(from + samplesPerStrip)),
                     style: const pw.TextStyle(fontSize: 8)),
-                _strip(millivolts, from, samplesPerStrip, beats, events, gain, sampleRateHz),
+                _strip(millivolts, from, samplesPerStrip, beats, events, artifacts, gain, sampleRateHz),
+                pw.SizedBox(height: 3 * mm),
+              ],
+            ),
+          ),
+
+        // the disturbances, the same way (their own heading, if there are no events before)
+        for (var (index, (artifact, from)) in artifactExtra.indexed)
+          pw.Inseparable(
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                if (index == 0) ...[
+                  pw.SizedBox(height: 3 * mm),
+                  pw.Text(t.reportArtifactStrips, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                  pw.SizedBox(height: 2 * mm),
+                ],
+                pw.Text(t.reportArtifactStrip(artifactLabel(artifact, sampleRateHz), time(from), time(from + samplesPerStrip)),
+                    style: const pw.TextStyle(fontSize: 8)),
+                _strip(millivolts, from, samplesPerStrip, beats, events, artifacts, gain, sampleRateHz),
                 pw.SizedBox(height: 3 * mm),
               ],
             ),
@@ -221,7 +256,8 @@ class PdfReport {
   // one strip of EKG paper with the signal
   // PDF coordinates start at the BOTTOM left corner, y goes up (on the screen it goes down)
   static pw.Widget _strip(
-      Float32List mv, int from, int count, List<int> beats, List<int> events, int gain, int sampleRateHz) {
+      Float32List mv, int from, int count, List<int> beats, List<int> events, List<Artifact> artifacts, int gain,
+      int sampleRateHz) {
     double mm = PdfPageFormat.mm;
     double width = stripSeconds * paperSpeedMmPerS * mm;
     double height = stripHeightMm * mm;
@@ -233,6 +269,26 @@ class PdfReport {
           ..setFillColor(_paper)
           ..drawRect(0, 0, width, height)
           ..fillPath();
+        // disturbed parts: light orange under the grid, an orange flag where they start
+        double xStep = width / count;
+        for (Artifact a in artifacts) {
+          if (a.end <= from || a.start >= from + count) continue;
+          double x0 = max(0, a.start - from) * xStep;
+          double x1 = min(count, a.end - from) * xStep;
+          canvas
+            ..setFillColor(_artifactBand)
+            ..drawRect(x0, 0, x1 - x0, height)
+            ..fillPath();
+          if (a.start >= from) {
+            canvas
+              ..setFillColor(_artifactColor)
+              ..moveTo(x0, height)
+              ..lineTo(x0 + 2.5 * mm, height - 1.2 * mm)
+              ..lineTo(x0, height - 2.4 * mm)
+              ..closePath()
+              ..fillPath();
+          }
+        }
         // small squares every 1 mm, then big squares every 5 mm on top
         _grid(canvas, width, height, 1 * mm, _smallGrid, 0.2);
         _grid(canvas, width, height, 5 * mm, _bigGrid, 0.5);

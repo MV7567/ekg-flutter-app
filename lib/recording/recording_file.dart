@@ -6,6 +6,7 @@ import '../ekg_config.dart';                        // sampleRateHz, millivoltsP
 import '../filters/biquad_filter.dart';             // EkgDisplayFilter
 import '../filters/spike_remover.dart';             // the same spike removing as live
 import '../heart_rate_detector.dart';                // beats in a whole recording
+import '../artifact_detector.dart';                 // disturbed parts (cough, movement)
 import 'csv_recorder.dart';                         // publicDownloadPath
 
 // information about one saved recording, read from its header and last line,
@@ -127,7 +128,8 @@ class RecordingInfo {
     List<String> lines = File(path).readAsLinesSync();
     Float32List millivolts = filterMillivolts(parseMillivolts(lines));
     List<int> beats = HeartRateDetector.findBeats(millivolts, sampleRateHz);
-    return RecordingData(millivolts, Int32List.fromList(beats), Int32List.fromList(parseEvents(lines)));
+    List<Artifact> artifacts = ArtifactDetector.find(millivolts, beats, sampleRateHz);
+    return RecordingData(millivolts, Int32List.fromList(beats), Int32List.fromList(parseEvents(lines)), artifacts);
   }
 
   // ---- pure functions below: no files, so they can be tested ----
@@ -249,9 +251,11 @@ class RecordingInfo {
 // a loaded recording for the view screen
 // a plain class with typed lists, so compute() can send it back from the background isolate
 class RecordingData {
-  RecordingData(this.millivolts, this.beats, [Int32List? events]) : events = events ?? Int32List(0);
+  RecordingData(this.millivolts, this.beats, [Int32List? events, this.artifacts = const []])
+      : events = events ?? Int32List(0);
 
   final Float32List millivolts;   // filtered samples, index = sample number
   final Int32List beats;          // sample numbers of the R waves, in order
   final Int32List events;         // sample numbers of the marked events, in order
+  final List<Artifact> artifacts; // disturbed parts found automatically, in order
 }

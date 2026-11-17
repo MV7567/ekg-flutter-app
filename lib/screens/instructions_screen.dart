@@ -7,6 +7,15 @@ import '../l10n/app_localizations.dart';
 class InstructionsScreen extends StatelessWidget {
   const InstructionsScreen({super.key});
 
+  // the colors of the leads on the cable of this kit (not the IEC or AHA standard colors!)
+  static const Color rightArmColor = Color(0xFF43A047);   // green, marked R
+  static const Color leftArmColor = Color(0xFFE53935);    // red, no letter
+  static const Color leftLegColor = Color(0xFFFDD835);    // yellow, marked L
+
+  // black text on a light color (yellow), white on a dark one
+  static Color textOn(Color color) =>
+      ThemeData.estimateBrightnessForColor(color) == Brightness.light ? Colors.black : Colors.white;
+
   @override
   Widget build(BuildContext context) {
     ColorScheme colors = Theme.of(context).colorScheme;
@@ -36,16 +45,15 @@ class InstructionsScreen extends StatelessWidget {
             _section(context, t.instrElectrodesTitle),
             Text(t.instrElectrodesIntro),
             const SizedBox(height: 8),
-            _ElectrodeRow('RA', t.instrRightArm, t.instrRightArmWhere),
-            _ElectrodeRow('LA', t.instrLeftArm, t.instrLeftArmWhere),
-            _ElectrodeRow('LL', t.instrLeftLeg, t.instrLeftLegWhere),
+            _ElectrodeRow('RA', t.instrRightArm, t.instrRightArmWhere, rightArmColor, t.instrCableRightArm),
+            _ElectrodeRow('LA', t.instrLeftArm, t.instrLeftArmWhere, leftArmColor, t.instrCableLeftArm),
+            _ElectrodeRow('LL', t.instrLeftLeg, t.instrLeftLegWhere, leftLegColor, t.instrCableLeftLeg),
             const SizedBox(height: 12),
             Center(
               child: CustomPaint(
                 size: const Size(220, 230),
                 painter: _ElectrodeMapPainter(
                   bodyColor: colors.onSurfaceVariant,
-                  dotColor: colors.primary,
                   textColor: colors.onSurface,
                 ),
               ),
@@ -84,13 +92,15 @@ class InstructionsScreen extends StatelessWidget {
       );
 }
 
-// "RA  Right arm" + where, one line per electrode
+// "RA  Right arm" + where + the lead on the cable, one row per electrode
 class _ElectrodeRow extends StatelessWidget {
-  const _ElectrodeRow(this.label, this.name, this.where);
+  const _ElectrodeRow(this.label, this.name, this.where, this.color, this.cable);
 
   final String label;
   final String name;
   final String where;
+  final Color color;    // the color of the lead on the cable
+  final String cable;   // "green lead, marked R"
 
   @override
   Widget build(BuildContext context) {
@@ -102,12 +112,20 @@ class _ElectrodeRow extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 16,
-            backgroundColor: colors.primary,
-            child: Text(label, style: TextStyle(fontSize: 11, color: colors.onPrimary)),
+            backgroundColor: color,
+            child: Text(label, style: TextStyle(fontSize: 11, color: InstructionsScreen.textOn(color))),
           ),
           const SizedBox(width: 12),
           // Expanded: the long text wraps instead of overflowing to the right
-          Expanded(child: Text('$name: $where')),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('$name: $where'),
+                Text(cable, style: TextStyle(fontSize: 13, color: colors.onSurfaceVariant)),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -136,10 +154,9 @@ class _Bullet extends StatelessWidget {
 
 // simple body seen from the front, with the 3 electrode positions
 class _ElectrodeMapPainter extends CustomPainter {
-  _ElectrodeMapPainter({required this.bodyColor, required this.dotColor, required this.textColor});
+  _ElectrodeMapPainter({required this.bodyColor, required this.textColor});
 
   final Color bodyColor;
-  final Color dotColor;
   final Color textColor;
 
   @override
@@ -172,13 +189,19 @@ class _ElectrodeMapPainter extends CustomPainter {
     canvas.drawLine(Offset(cx + w * 0.10, h * 0.68), Offset(cx + w * 0.14, h * 0.98), outline);
 
     // electrodes: the person's right is on the left of the picture
-    _electrode(canvas, Offset(cx - w * 0.15, h * 0.29), 'RA', labelLeft: true);
-    _electrode(canvas, Offset(cx + w * 0.15, h * 0.29), 'LA', labelLeft: false);
-    _electrode(canvas, Offset(cx + w * 0.13, h * 0.58), 'LL', labelLeft: false);
+    // every dot in the color of its lead on the cable
+    _electrode(canvas, Offset(cx - w * 0.15, h * 0.29), 'RA', InstructionsScreen.rightArmColor, labelLeft: true);
+    _electrode(canvas, Offset(cx + w * 0.15, h * 0.29), 'LA', InstructionsScreen.leftArmColor, labelLeft: false);
+    _electrode(canvas, Offset(cx + w * 0.13, h * 0.58), 'LL', InstructionsScreen.leftLegColor, labelLeft: false);
   }
 
-  void _electrode(Canvas canvas, Offset at, String label, {required bool labelLeft}) {
-    canvas.drawCircle(at, 7, Paint()..color = dotColor);
+  void _electrode(Canvas canvas, Offset at, String label, Color color, {required bool labelLeft}) {
+    canvas.drawCircle(at, 7, Paint()..color = color);
+    // a thin ring, so the yellow dot is visible on a light background too
+    canvas.drawCircle(at, 7, Paint()
+      ..color = bodyColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1);
     TextPainter text = TextPainter(
       text: TextSpan(text: label, style: TextStyle(color: textColor, fontSize: 13, fontWeight: FontWeight.bold)),
       textDirection: TextDirection.ltr,
@@ -191,6 +214,5 @@ class _ElectrodeMapPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _ElectrodeMapPainter oldDelegate) =>
       oldDelegate.bodyColor != bodyColor ||
-      oldDelegate.dotColor != dotColor ||
       oldDelegate.textColor != textColor;
 }

@@ -7,6 +7,7 @@ import '../ekg_config.dart';
 import '../heart_rate_detector.dart';        // average bpm, bpm in the window
 import '../recording/recording_file.dart';
 import '../rr_stats.dart';                   // min / max bpm, HRV, tachogram
+import '../artifact_detector.dart';          // Artifact
 import '../widgets/ekg_chart.dart';
 import '../widgets/fullscreen_chart.dart';
 import '../widgets/zoom_selector.dart';
@@ -49,6 +50,9 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
   // the marked events of the whole recording, and the ones inside the window (positions in it)
   Int32List _events = Int32List(0);
   final ValueNotifier<List<int>> _windowEvents = ValueNotifier(const []);
+  // disturbed parts found automatically (cough, movement), in the whole recording and in the window
+  List<Artifact> _artifacts = const [];
+  final ValueNotifier<List<Artifact>> _windowArtifacts = ValueNotifier(const []);
 
   int get _maxStart => max(0, (_samples?.length ?? 0) - _window.capacity);
 
@@ -70,8 +74,9 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
         _samples = data.millivolts;
         _beats = data.beats;
         _events = data.events;
+        _artifacts = data.artifacts;
         _averageBpm = HeartRateDetector.averageBpm(data.beats, sampleRateHz);
-        _stats = RrStats.fromBeats(data.beats, sampleRateHz);   // a few hundred beats, fast enough here
+        _stats = RrStats.fromBeats(data.beats, sampleRateHz, artifacts: data.artifacts);   // a few hundred beats, fast enough here
       });
       _showWindow(0);
     } catch (e) {
@@ -95,6 +100,10 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
     _windowBeats.value = [for (int beat in _beats) if (beat >= start && beat < end) beat - start];
     _windowBpm.value = HeartRateDetector.bpmBetween(_beats, start, end, sampleRateHz);
     _windowEvents.value = [for (int event in _events) if (event >= start && event < end) event - start];
+    _windowArtifacts.value = [
+      for (Artifact a in _artifacts)
+        if (a.end > start && a.start < end) Artifact(a.start - start, a.end - start),
+    ];
   }
 
   @override
@@ -102,6 +111,7 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
     _windowBpm.dispose();
     _windowBeats.dispose();
     _windowEvents.dispose();
+    _windowArtifacts.dispose();
     _window.dispose();    // because EkgBuffer is ChangeNotifier
     super.dispose();
   }
@@ -159,7 +169,7 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
     if (samples == null) return;
     setState(() => _makingReport = true);
     await shareReport(context, widget.recording,
-        note: _note, millivolts: samples, beats: _beats, events: _events, stats: _stats);
+        note: _note, millivolts: samples, beats: _beats, events: _events, artifacts: _artifacts, stats: _stats);
     if (mounted) setState(() => _makingReport = false);
   }
 
@@ -217,6 +227,7 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
                         mvPerBigSquare: _mvPerBigSquare,
                         beatMarkers: _windowBeats,   // red triangles under the R waves
                         eventMarkers: _windowEvents, // blue lines at the marked events
+                        artifactMarkers: _windowArtifacts,   // orange bands at the disturbances
                       ),
                     ),
                     Positioned(top: 0, right: 0, child: FullscreenButton(onPressed: _openFullscreen)),
@@ -267,6 +278,22 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
                   ),
               ],
             ),
+          // the disturbances found by the app: a tap shows the middle of it
+          if (_artifacts.isNotEmpty)
+            Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              children: [
+                Text(AppLocalizations.of(context).viewArtifacts),
+                for (Artifact a in _artifacts)
+                  ActionChip(
+                    avatar: const Icon(Icons.warning_amber, color: EkgChart.artifactColor, size: 18),
+                    label: Text(artifactLabel(a, sampleRateHz)),
+                    onPressed: () => _showWindow((a.start + a.end) ~/ 2 - _window.capacity ~/ 2),
+                  ),
+              ],
+            ),
           const SizedBox(height: 8),
           ZoomSelector(   // Auto ×1 ×2 ×4 ×8, the same on every screen
             value: _mvPerBigSquare,
@@ -292,6 +319,7 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
       bpm: _windowBpm,
       beatMarkers: _windowBeats,
       eventMarkers: _windowEvents,
+      artifactMarkers: _windowArtifacts,
     );
     if (mv != null && mounted) setState(() => _mvPerBigSquare = mv);   // zoom chosen in full screen
   }
