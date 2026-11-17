@@ -98,9 +98,12 @@ void main() {
     await tester.scrollUntilVisible(advanced, 300, scrollable: find.byType(Scrollable).first);
     await tester.pumpAndSettle();
     expect(AppSettings.instance.advancedFeatures, isFalse);
+    expect(find.text('CSV with raw values only'), findsNothing);   // only with the advanced features
     await tester.tap(advanced);
     await tester.pumpAndSettle();
     expect(AppSettings.instance.advancedFeatures, isTrue);
+    expect(find.text('CSV with raw values only'), findsOneWidget);
+    expect(AppSettings.instance.csvRawOnlyInUse, isFalse);   // off by default
     await tester.tap(advanced);
     await tester.pumpAndSettle();
     expect(AppSettings.instance.advancedFeatures, isFalse);

@@ -83,6 +83,14 @@ class SettingsScreen extends StatelessWidget {
               value: settings.advancedFeatures,
               onChanged: settings.setAdvancedFeatures,
             ),
+            // only visible (and used) with the advanced features
+            if (settings.advancedFeatures)
+              SwitchListTile(
+                title: Text(t.settingsCsvRawOnly),
+                subtitle: Text(t.settingsCsvRawOnlyHint),
+                value: settings.csvRawOnly,
+                onChanged: settings.setCsvRawOnly,
+              ),
 
             _header(t.settingsLanguage),
             RadioGroup<String>(

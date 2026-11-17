@@ -110,14 +110,17 @@ class _RecordingsScreenState extends State<RecordingsScreen> {
                       RecordingInfo r = recordings[index];
                       String device = r.deviceName.isEmpty ? '' : '  ·  ${r.deviceName}';
                       String bpm = r.averageBpm == null ? '' : '  ·  ♥ ${r.averageBpm} bpm';   // from the footer
+                      // the first line: test signal mark and / or the note, only if there is one
+                      String firstLine = [if (r.isTestSignal) '🧪 ${t.deviceAdsTest}', if (r.note.isNotEmpty) r.note]
+                          .join('  ·  ');
                       return ListTile(
                         leading: const Icon(Icons.monitor_heart),
                         title: Text(RecordingsScreen.formatStart(r.start, t)),
                         // the note in its own line above the details, only if there is one
-                        subtitle: Text('${r.note.isEmpty ? '' : '${r.note}\n'}'
+                        subtitle: Text('${firstLine.isEmpty ? '' : '$firstLine\n'}'
                             '${RecordingsScreen.formatDuration(r.duration)}  ·  '
                             '${RecordingsScreen.formatSize(r.sizeBytes)}$bpm$device'),
-                        isThreeLine: r.note.isNotEmpty,   // more room for the extra line
+                        isThreeLine: firstLine.isNotEmpty,   // more room for the extra line
                         onTap: () => _open(r),
                         // ⋮ menu on the right
                         trailing: PopupMenuButton<String>(  // each position has value (share/delete)

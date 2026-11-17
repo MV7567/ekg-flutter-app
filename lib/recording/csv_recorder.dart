@@ -33,6 +33,17 @@ class CsvRecorder {
   // "# event: 5712" = at sample 5712, written between the samples at the moment of the tap
   static const String eventTag = '# event:';
 
+  // written once, before the first sample of the internal test signal of the ADS1194
+  // (the firmware marks those packets), the app then shows a calibration check instead of heart rate
+  static const String testSignalTag = '# test signal: ADS1194 internal';
+
+  // the column names line: all 4 columns, or only the sample number and the raw value
+  // ("raw only" in the advanced settings: about half the file size, time and mV can be
+  //  calculated back from them, the app reads both kinds)
+  static const String columnsFull = 'sample,time_s,raw,mV';
+  static const String columnsRawOnly = 'sample,raw';
+  bool _rawOnly = false;
+
   static const MethodChannel _mediaScanner = MethodChannel('ecg_ble_app/media_scanner');
   // connection between dart and android native code, the channel name is arbitrary but must match the one in MainActivity.kt
 
@@ -49,7 +60,8 @@ class CsvRecorder {
   String get filePath => _filePath;
 
   // creates a new file with the header, returns false if no folder is writable
-  Future<bool> open({required String deviceName}) async {
+  Future<bool> open({required String deviceName, bool rawOnly = false}) async {
+    _rawOnly = rawOnly;
     // readable timestamp for the file name, e.g. ekg_2026-10-21_14-30-05.csv
     // one "now" for the file name and the header, so they always show the same time
     DateTime start = DateTime.now();
@@ -64,7 +76,7 @@ class CsvRecorder {
         "# start: $startIso\n"
         "# sample rate: $sampleRateHz Hz, gain: $pgaGain, 1 LSB = ${(millivoltsPerLsb * 1000).toStringAsFixed(2)} uV\n"
         "# lost BLE packets are skipped, the sample numbers jump over the gap\n"
-        "sample,time_s,raw,mV\n";
+        "${rawOnly ? columnsRawOnly : columnsFull}\n";
 
     // 1. try the public Download folder
     File? file = await _tryCreateFile(publicDownloadPath, baseName, header);
@@ -97,7 +109,7 @@ class CsvRecorder {
 
   // one line: sample number, time, raw value, value in mV
   void writeSample(int sampleIndex, int rawValue) {
-    _sink?.writeln(csvLine(sampleIndex, rawValue));
+    _sink?.writeln(_rawOnly ? rawCsvLine(sampleIndex, rawValue) : csvLine(sampleIndex, rawValue));
   }
 
   // marks an event at this sample (the newest one received when the button was tapped)
@@ -111,6 +123,14 @@ class CsvRecorder {
     double millivolts = rawValue * millivoltsPerLsb;
     return "$sampleIndex,${timeS.toStringAsFixed(3)},$rawValue,${millivolts.toStringAsFixed(4)}";
   }
+  // marks the recording as the internal test signal (see testSignalTag)
+  void writeTestSignalMark() {
+    _sink?.writeln(testSignalTag);
+  }
+
+  // the raw only line: "5712,-1475"
+  static String rawCsvLine(int sampleIndex, int rawValue) => '$sampleIndex,$rawValue';
+
   // one csv line
   // / division by sampleRateHz gives the time in seconds, to 3 decimal places is enough for 1 kHz
   // time has 3 decimal places, because step 4ms

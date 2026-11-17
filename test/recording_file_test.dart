@@ -136,4 +136,68 @@ void main() {
     expect(data.events, [700, 1800]);
     expect((await RecordingInfo.load(file)).duration, const Duration(seconds: 10));
   });
+
+  // ---- "raw only" files: "sample,raw" ----
+
+  test('raw only: the 2nd column is the raw value, gaps filled, the duration from 2 columns', () {
+    List<String> rawHeader = [...header.sublist(0, header.length - 1), CsvRecorder.columnsRawOnly];
+    expect(CsvRecorder.rawCsvLine(5712, -1475), '5712,-1475');
+    List<String> lines = [...rawHeader, '0,1000', '1,-1000', '3,0', '# average bpm: 70'];
+    List<double> mv = RecordingInfo.parseMillivolts(lines);
+    expect(mv.length, 4);                                            // sample 2 was lost, filled
+    expect(mv[0], closeTo(1000 * millivoltsPerLsb, 1e-4));
+    expect(mv[2], mv[1]);
+    expect(RecordingInfo.durationFromLastLines(lines), const Duration(milliseconds: 16));   // 4 samples
+  });
+
+  test('a real raw only file: written by CsvRecorder lines, read like a full one', () async {
+    Directory folder = await Directory.systemTemp.createTemp('ekg_test');
+    addTearDown(() => folder.delete(recursive: true));
+    File raw = File('${folder.path}/ekg_2026-11-04_14-30-05.csv');
+    File full = File('${folder.path}/ekg_2026-11-04_14-31-05.csv');
+    List<String> rawHeader = [...header.sublist(0, header.length - 1), CsvRecorder.columnsRawOnly];
+    List<String> rawLines = [...rawHeader, for (int i = 0; i < 2500; i++) CsvRecorder.rawCsvLine(i, i % 300 - 150), '# event: 700'];
+    List<String> fullLines = [...header, for (int i = 0; i < 2500; i++) CsvRecorder.csvLine(i, i % 300 - 150), '# event: 700'];
+    await raw.writeAsString('${rawLines.join('\n')}\n');
+    await full.writeAsString('${fullLines.join('\n')}\n');
+
+    RecordingData a = RecordingInfo.loadForView(raw.path);
+    RecordingData b = RecordingInfo.loadForView(full.path);
+    expect(a.millivolts.length, 2500);
+    for (int i = 0; i < 2500; i++) {
+      expect(a.millivolts[i], closeTo(b.millivolts[i], 1e-3));   // the same signal (mV rounded to 4 places in the full file)
+    }
+    expect(a.events, [700]);
+    expect((await RecordingInfo.load(raw)).duration, const Duration(seconds: 10));
+    expect(await raw.length(), lessThan(await full.length() * 0.6));   // about half the size
+  });
+
+  // ---- the internal test signal of the ADS1194 ----
+
+  test('test signal: a real file with the mark, no beats, the amplitude of the square', () async {
+    Directory folder = await Directory.systemTemp.createTemp('ekg_test');
+    addTearDown(() => folder.delete(recursive: true));
+    File file = File('${folder.path}/ekg_2026-11-04_14-30-05.csv');
+    // like the real recording: 229 / -99 raw (2.002 mV), ~1 Hz (128 samples up, 128 down), an edge sample between
+    int raw(int i) => i % 128 == 0 ? 65 : ((i ~/ 128).isEven ? 229 : -99);
+    List<String> lines = [...header, CsvRecorder.testSignalTag, for (int i = 0; i < 2500; i++) CsvRecorder.csvLine(i, raw(i))];
+    await file.writeAsString('${lines.join('\n')}\n');
+
+    RecordingData data = RecordingInfo.loadForView(file.path);
+    expect(data.beats, isEmpty);          // the edges are not heart beats
+    expect(data.artifacts, isEmpty);
+    expect(data.testPeakToPeakMv, closeTo(328 * millivoltsPerLsb, 1e-3));   // 2.002 mV
+    expect((await RecordingInfo.load(file)).isTestSignal, isTrue);
+    expect(RecordingInfo.expectedTestPeakToPeakMv, closeTo(2.0, 1e-9));
+  });
+
+  test('a normal recording is not a test signal', () async {
+    Directory folder = await Directory.systemTemp.createTemp('ekg_test');
+    addTearDown(() => folder.delete(recursive: true));
+    File file = File('${folder.path}/ekg_2026-11-04_14-30-05.csv');
+    List<String> lines = [...header, for (int i = 0; i < 500; i++) CsvRecorder.csvLine(i, 0)];
+    await file.writeAsString('${lines.join('\n')}\n');
+    expect((await RecordingInfo.load(file)).isTestSignal, isFalse);
+    expect(RecordingInfo.loadForView(file.path).testPeakToPeakMv, isNull);
+  });
 }

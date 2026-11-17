@@ -129,6 +129,13 @@ class AppLocalizationsPl extends AppLocalizations {
   String get settingsAdvancedFeatures => 'Funkcje zaawansowane';
 
   @override
+  String get settingsCsvRawOnly => 'CSV tylko z surowymi wartościami';
+
+  @override
+  String get settingsCsvRawOnlyHint =>
+      'Tylko numer próbki i surowa wartość z ADC, plik ok. 2 razy mniejszy. Czas = próbka / 250, mV = surowa × 0,0061. Aplikacja czyta oba rodzaje.';
+
+  @override
   String get settingsAdvancedFeaturesHint =>
       'Szczegóły techniczne podczas pomiaru (próbki, pakiety, dBm, ścieżka pliku) i sygnał testowy bez urządzenia';
 
@@ -259,6 +266,14 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get deviceAdsTest => 'Sygnał testowy ADS1194';
+
+  @override
+  String testSignalResult(String expected, String measured, String error) {
+    return 'Oczekiwane $expected mV międzyszczytowo (prostokąt ±1 mV, ok. 1 Hz), zmierzone $measured mV ($error). Nagrane bez osoby, bez statystyk tętna.';
+  }
+
+  @override
+  String get reportSignal => 'Sygnał';
 
   @override
   String get deviceAdsTestHint =>

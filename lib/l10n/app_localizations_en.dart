@@ -128,6 +128,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAdvancedFeatures => 'Advanced features';
 
   @override
+  String get settingsCsvRawOnly => 'CSV with raw values only';
+
+  @override
+  String get settingsCsvRawOnlyHint =>
+      'Only the sample number and the raw ADC value, about half the file size. Time = sample / 250, mV = raw × 0.0061. The app reads both kinds.';
+
+  @override
   String get settingsAdvancedFeaturesHint =>
       'Technical details while measuring (samples, packets, dBm, file path) and the test signal without the device';
 
@@ -258,6 +265,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get deviceAdsTest => 'ADS1194 test signal';
+
+  @override
+  String testSignalResult(String expected, String measured, String error) {
+    return 'Expected $expected mV peak to peak (a ±1 mV square, about 1 Hz), measured $measured mV ($error). Recorded without a person, no heart statistics.';
+  }
+
+  @override
+  String get reportSignal => 'Signal';
 
   @override
   String get deviceAdsTestHint =>

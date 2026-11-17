@@ -21,6 +21,7 @@ class RecordingInfo {
     required this.duration,
     this.note = '',
     this.averageBpm,
+    this.isTestSignal = false,
   });
 
   final File file;
@@ -31,6 +32,7 @@ class RecordingInfo {
   final Duration duration;
   final String note;           // "" = no note (also all old files)
   final int? averageBpm;       // from the footer, null = not saved (old files, too few beats)
+  final bool isTestSignal;     // recorded with the internal test signal of the ADS1194, not a person
 
   String get fileName => file.uri.pathSegments.last;
 
@@ -91,6 +93,8 @@ class RecordingInfo {
         duration: durationFromLastLines(tailLines),
         note: parseNote(tailLines),
         averageBpm: parseAverageBpm(tailLines),
+        // the mark is right after the header, so it is in the first 1024 bytes
+        isTestSignal: headLines.contains(CsvRecorder.testSignalTag),
       );
     } finally {
       await raf.close();   // file always closes, also after an error
@@ -124,32 +128,55 @@ class RecordingInfo {
 
   // everything the view screen needs, in one trip to the background isolate:
   // the filtered samples and the heart beats found in them
+  // a test signal recording: no beats and no disturbances (the edges of the square are not a heart),
+  // but its measured amplitude instead (the calibration check)
   static RecordingData loadForView(String path) {
     List<String> lines = File(path).readAsLinesSync();
-    Float32List millivolts = filterMillivolts(parseMillivolts(lines));
+    Float32List unfiltered = parseMillivolts(lines);
+    if (lines.contains(CsvRecorder.testSignalTag)) {
+      double peakToPeak = testSignalPeakToPeak(unfiltered);
+      return RecordingData(filterMillivolts(unfiltered), Int32List(0), Int32List.fromList(parseEvents(lines)),
+          const [], peakToPeak);
+    }
+    Float32List millivolts = filterMillivolts(unfiltered);
     List<int> beats = HeartRateDetector.findBeats(millivolts, sampleRateHz);
     List<Artifact> artifacts = ArtifactDetector.find(millivolts, beats, sampleRateHz);
     return RecordingData(millivolts, Int32List.fromList(beats), Int32List.fromList(parseEvents(lines)), artifacts);
   }
+
+  // the test signal is a square with 2 levels: the upper and the lower one are the values at 90 % and
+  // at 10 % of the sorted samples (the few samples on the edges in between don't matter)
+  // before the filter: the 0.5 Hz high-pass would bend the flat parts of the square
+  static double testSignalPeakToPeak(Float32List unfilteredMv) {
+    if (unfilteredMv.isEmpty) return 0;
+    List<double> sorted = List.of(unfilteredMv)..sort();
+    return sorted[(0.9 * (sorted.length - 1)).round()] - sorted[(0.1 * (sorted.length - 1)).round()];
+  }
+
+  // the expected test signal: +-1 x VREF / 2400 = +-1 mV -> 2 mV peak to peak (datasheet p. 42)
+  static const double expectedTestPeakToPeakMv = 2 * vref / 2.4;
 
   // ---- pure functions below: no files, so they can be tested ----
 
   // "sample,time_s,raw,mV" lines -> mV values, the index in the list = the sample number
   // - header (#...), column names and cut lines are skipped
   // - mV column if it exists, otherwise raw x LSB
+  // - a "raw only" file (column names "sample,raw"): the raw value is the 2nd column
   // - lost packets: the sample number jumps, the gap is filled with the last value
   //   (a flat line), so the time axis stays correct
   static Float32List parseMillivolts(List<String> lines) {  
     // every line sample, time_s, raw, mV are changed into mV value, list position is the sample number
     List<double> values = [];
+    bool rawOnly = false;   // known from the column names line, it comes before the samples
     for (String line in lines) {
+      if (line.trim() == CsvRecorder.columnsRawOnly) rawOnly = true;
       List<String> columns = line.split(',');
-      if (columns.length < 3) continue;           // #, header, empty or cut line skips
+      if (columns.length < (rawOnly ? 2 : 3)) continue;   // #, header, empty or cut line skips
       int? sample = int.tryParse(columns[0]);
       if (sample == null) continue;               // "sample,time_s,..." column names
-      double? mv = columns.length >= 4 ? double.tryParse(columns[3]) : null;
+      double? mv = !rawOnly && columns.length >= 4 ? double.tryParse(columns[3]) : null;
       if (mv == null) {
-        int? raw = int.tryParse(columns[2]);
+        int? raw = int.tryParse(columns[rawOnly ? 1 : 2]);
         if (raw == null) continue;
         mv = raw * millivoltsPerLsb;
       } // takes a mV column if possible, if there isnt it calcs raw x millivoltsPerLsb
@@ -238,7 +265,9 @@ class RecordingInfo {
     // started in the middle of a line), so take the last line that parses
     for (int i = tailLines.length - 1; i >= 0; i--) {
       List<String> columns = tailLines[i].split(',');
-      if (columns.length < 3) continue;   // cut line or empty line
+      // at least "sample,..." with the comma: the sample number itself is whole then
+      // (2 columns is enough, the raw only files have just 2)
+      if (columns.length < 2) continue;   // cut line or empty line
       int? sample = int.tryParse(columns[0]);
       if (sample != null) {
         return Duration(milliseconds: ((sample + 1) * 1000 / sampleRateHz).round());
@@ -251,11 +280,12 @@ class RecordingInfo {
 // a loaded recording for the view screen
 // a plain class with typed lists, so compute() can send it back from the background isolate
 class RecordingData {
-  RecordingData(this.millivolts, this.beats, [Int32List? events, this.artifacts = const []])
+  RecordingData(this.millivolts, this.beats, [Int32List? events, this.artifacts = const [], this.testPeakToPeakMv])
       : events = events ?? Int32List(0);
 
   final Float32List millivolts;   // filtered samples, index = sample number
   final Int32List beats;          // sample numbers of the R waves, in order
   final Int32List events;         // sample numbers of the marked events, in order
   final List<Artifact> artifacts; // disturbed parts found automatically, in order
+  final double? testPeakToPeakMv; // only for a test signal recording: its measured amplitude
 }

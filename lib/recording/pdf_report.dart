@@ -6,6 +6,7 @@ import '../l10n/app_localizations.dart';
 import '../rr_stats.dart';
 import '../artifact_detector.dart';           // Artifact, artifactLabel
 import '../screens/recordings_screen.dart';   // formatStart, formatDuration
+import '../screens/recording_actions.dart';   // testSignalResult
 import '../widgets/rr_tachogram.dart';        // the range of the tachogram
 
 // a PDF report of one recording (A4):
@@ -97,6 +98,7 @@ class PdfReport {
     required List<int> beats,          // sample numbers of the R waves
     List<int> events = const [],       // sample numbers of the marked events
     List<Artifact> artifacts = const [],   // disturbed parts found automatically
+    double? testPeakToPeakMv,          // a test signal recording: its measured amplitude, no heart statistics
     required RrStats? stats,
     required int sampleRateHz,
   }) async {
@@ -140,6 +142,7 @@ class PdfReport {
         _info(t.reportStart, RecordingsScreen.formatStart(start, t)),
         _info(t.reportLength, RecordingsScreen.formatDuration(length)),
         if (deviceName.isNotEmpty) _info(t.reportDevice, deviceName),
+        if (testPeakToPeakMv != null) _info(t.reportSignal, t.deviceAdsTest),
         if (note.isNotEmpty) _info(t.reportNote, note),
         if (events.isNotEmpty) _info(t.viewEvents, events.map(time).join(', ')),
         if (artifacts.isNotEmpty)
@@ -147,6 +150,12 @@ class PdfReport {
         pw.SizedBox(height: 6 * mm),
 
         // statistics, the same values as on the recording screen
+        // (a test signal recording: the calibration check instead)
+        if (testPeakToPeakMv != null) ...[
+          pw.Text(t.deviceAdsTest, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+          pw.SizedBox(height: 2 * mm),
+          pw.Text(testSignalResult(t, testPeakToPeakMv)),
+        ] else ...[
         pw.Text(t.statsTitle, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
         pw.SizedBox(height: 2 * mm),
         if (stats == null)
@@ -173,6 +182,7 @@ class PdfReport {
           _tachogram(stats, millivolts.length / sampleRateHz, 180 * mm, 35 * mm),
           pw.SizedBox(height: 1.5 * mm),
           pw.Text(t.statsHrvHint, style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+        ],
         ],
         pw.SizedBox(height: 6 * mm),
 

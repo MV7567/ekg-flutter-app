@@ -74,6 +74,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
   // mostly off = no average heart rate in the file (it would be counted from noise)
   int _leadOffPackets = 0;
   int _recordedPackets = 0;
+  // the test signal mark is already in the file (it is written once)
+  bool _testSignalMarked = false;
   // _isRecording says whether there is a recording in progress, whether the packets end up in the file and which label is on the button depend on this
   // _isBusy is set during sending the start/stop command, the button is turned off then
 
@@ -331,7 +333,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
     // a new file for every measurement
     // "TEST_SIGNAL" in the CSV header, so test files are easy to tell apart in Recordings
-    bool fileReady = await _recorder.open(deviceName: widget.device?.platformName ?? 'TEST_SIGNAL');
+    bool fileReady = await _recorder.open(
+        deviceName: widget.device?.platformName ?? 'TEST_SIGNAL', rawOnly: AppSettings.instance.csvRawOnlyInUse);
     if (!fileReady) {
       _showMessage((t) => t.deviceFileError);
       if (mounted) setState(() => _isBusy = false);   // the user could have left the screen during await
@@ -353,6 +356,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
       _eventCount = 0;
       _leadOffPackets = 0;
       _recordedPackets = 0;
+      _testSignalMarked = false;
       _bpm.value = null;
       _isPreviewing = false;
       _isRecording = true;
@@ -371,6 +375,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
     _eventCount = 0;
     _leadOffPackets = 0;
     _recordedPackets = 0;
+    _testSignalMarked = false;
     _isRecording = true;   // set before the command, so the first packet is not ignored
     // the screen doesn't go dark during the recording, otherwise the person reaches for the phone
     // and moves the electrodes / cables (= artifacts), every end of a recording turns it back off
@@ -506,6 +511,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
   // of the recording (the firmware reports it), otherwise noise would give e.g. "143 bpm"
   int? _averageBpmForFile() {
     if (_recordedPackets > 0 && _leadOffPackets * 2 > _recordedPackets) return null;
+    if (_testSignalMarked) return null;   // the edges of the test square are not heart beats
     return HeartRateDetector.averageBpm(_recordingBeats, sampleRateHz);
   }
 
@@ -553,6 +559,12 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
     // the 10 values of this packet in mV, for the chart
     List<double> packetMillivolts = [];
+
+    // the internal test signal (the firmware flag): marked once in the file, before its samples
+    if (toFile && !_testSignalMarked && packet.flags & flagTestSignal != 0) {
+      _recorder.writeTestSignalMark();
+      _testSignalMarked = true;
+    }
 
     for (int i = 0; i < packet.rawValues.length; i++) {
       // timed recording: samples after the chosen length are not saved, the file is exactly 30 s etc.

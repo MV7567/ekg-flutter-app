@@ -21,6 +21,7 @@ class AppSettings extends ChangeNotifier {    // extends ChangeNotifier, works l
   static const String _chartMatchesPaletteKey = 'chartMatchesPalette';
   static const String _beepOnBeatKey = 'beepOnBeat';
   static const String _advancedFeaturesKey = 'advancedFeatures';
+  static const String _csvRawOnlyKey = 'csvRawOnly';
 
   final SharedPreferencesAsync _prefs = SharedPreferencesAsync();
 
@@ -44,6 +45,12 @@ class AppSettings extends ChangeNotifier {    // extends ChangeNotifier, works l
   bool _advancedFeatures = false;
   bool get advancedFeatures => _advancedFeatures;
 
+  // true = the CSV has only "sample,raw" (about half the size), an advanced setting:
+  // it works only while the advanced features are on (see csvRawOnlyInUse)
+  bool _csvRawOnly = false;
+  bool get csvRawOnly => _csvRawOnly;
+  bool get csvRawOnlyInUse => _advancedFeatures && _csvRawOnly;
+
   // app language as a code: "en", "pl", ..., "" = like the phone
   String _languageCode = '';
   String get languageCode => _languageCode;
@@ -66,6 +73,7 @@ class AppSettings extends ChangeNotifier {    // extends ChangeNotifier, works l
       _chartMatchesPalette = await _prefs.getBool(_chartMatchesPaletteKey) ?? false;   // ?? false: nothing saved yet
       _beepOnBeat = await _prefs.getBool(_beepOnBeatKey) ?? false;
       _advancedFeatures = await _prefs.getBool(_advancedFeaturesKey) ?? false;
+      _csvRawOnly = await _prefs.getBool(_csvRawOnlyKey) ?? false;
     } catch (e) {
       // storage not readable -> the defaults stay, the app still starts
       debugPrint("Settings load error: $e");
@@ -122,6 +130,17 @@ class AppSettings extends ChangeNotifier {    // extends ChangeNotifier, works l
     notifyListeners();   // the screens that show the advanced things redraw
     try {
       await _prefs.setBool(_advancedFeaturesKey, value);
+    } catch (e) {
+      debugPrint("Settings save error: $e");
+    }
+  }
+
+  Future<void> setCsvRawOnly(bool value) async {
+    if (value == _csvRawOnly) return;
+    _csvRawOnly = value;
+    notifyListeners();
+    try {
+      await _prefs.setBool(_csvRawOnlyKey, value);
     } catch (e) {
       debugPrint("Settings save error: $e");
     }

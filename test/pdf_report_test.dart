@@ -9,6 +9,7 @@ import 'package:ecg_ble_app/filters/biquad_filter.dart';
 import 'package:ecg_ble_app/heart_rate_detector.dart';
 import 'package:ecg_ble_app/l10n/app_localizations.dart';
 import 'package:ecg_ble_app/recording/pdf_report.dart';
+import 'package:ecg_ble_app/screens/recording_actions.dart';
 import 'package:ecg_ble_app/rr_stats.dart';
 
 const int fs = 250;
@@ -79,5 +80,20 @@ void main() {
       millivolts: filteredEkg(2), beats: const [], stats: null, sampleRateHz: fs,
     );
     expect(String.fromCharCodes(short.sublist(0, 5)), '%PDF-');
+
+    // a test signal recording: the calibration check instead of the statistics
+    Uint8List test = await PdfReport.build(
+      t: t, regular: regular, bold: bold,
+      start: null, deviceName: 'ESP32_EKG', note: '',
+      millivolts: filteredEkg(10), beats: const [], stats: null, sampleRateHz: fs, testPeakToPeakMv: 2.002,
+    );
+    expect(String.fromCharCodes(test.sublist(0, 5)), '%PDF-');
+  });
+
+  test('the calibration text: expected, measured and the error', () {
+    AppLocalizations en = lookupAppLocalizations(const Locale('en'));
+    expect(testSignalResult(en, 2.002), startsWith('Expected 2.000 mV peak to peak'));
+    expect(testSignalResult(en, 2.002), contains('measured 2.002 mV (+0.1 %)'));
+    expect(testSignalResult(en, 1.9), contains('(-5.0 %)'));
   });
 }

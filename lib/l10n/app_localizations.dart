@@ -320,6 +320,18 @@ abstract class AppLocalizations {
   /// **'Advanced features'**
   String get settingsAdvancedFeatures;
 
+  /// No description provided for @settingsCsvRawOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'CSV with raw values only'**
+  String get settingsCsvRawOnly;
+
+  /// No description provided for @settingsCsvRawOnlyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Only the sample number and the raw ADC value, about half the file size. Time = sample / 250, mV = raw × 0.0061. The app reads both kinds.'**
+  String get settingsCsvRawOnlyHint;
+
   /// No description provided for @settingsAdvancedFeaturesHint.
   ///
   /// In en, this message translates to:
@@ -559,6 +571,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'ADS1194 test signal'**
   String get deviceAdsTest;
+
+  /// No description provided for @testSignalResult.
+  ///
+  /// In en, this message translates to:
+  /// **'Expected {expected} mV peak to peak (a ±1 mV square, about 1 Hz), measured {measured} mV ({error}). Recorded without a person, no heart statistics.'**
+  String testSignalResult(String expected, String measured, String error);
+
+  /// No description provided for @reportSignal.
+  ///
+  /// In en, this message translates to:
+  /// **'Signal'**
+  String get reportSignal;
 
   /// No description provided for @deviceAdsTestHint.
   ///

@@ -39,6 +39,7 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
   // heart beats of the whole recording, found once while loading
   Int32List _beats = Int32List(0);   // sample numbers of the R waves
   int? _averageBpm;                  // whole recording, null = not enough beats
+  double? _testPeakToPeak;           // a test signal recording: its measured amplitude, otherwise null
   RrStats? _stats;                   // min / max bpm, HRV, tachogram, null = not enough beats
   // the note, can be changed here, then the list has to read the files again when going back
   late String _note = widget.recording.note;
@@ -75,6 +76,7 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
         _beats = data.beats;
         _events = data.events;
         _artifacts = data.artifacts;
+        _testPeakToPeak = data.testPeakToPeakMv;
         _averageBpm = HeartRateDetector.averageBpm(data.beats, sampleRateHz);
         _stats = RrStats.fromBeats(data.beats, sampleRateHz, artifacts: data.artifacts);   // a few hundred beats, fast enough here
       });
@@ -169,7 +171,8 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
     if (samples == null) return;
     setState(() => _makingReport = true);
     await shareReport(context, widget.recording,
-        note: _note, millivolts: samples, beats: _beats, events: _events, artifacts: _artifacts, stats: _stats);
+        note: _note, millivolts: samples, beats: _beats, events: _events, artifacts: _artifacts, stats: _stats,
+        testPeakToPeakMv: _testPeakToPeak);
     if (mounted) setState(() => _makingReport = false);
   }
 
@@ -301,7 +304,17 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
           ),
           const SizedBox(height: 16),
           // the whole recording: heart rate min / avg / max, HRV and the tachogram
-          RecordingStatsCard(stats: _stats, durationSeconds: samples.length / sampleRateHz),
+          // (a test signal recording: the calibration check instead)
+          if (_testPeakToPeak != null)
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.science),
+                title: Text(AppLocalizations.of(context).deviceAdsTest),
+                subtitle: Text(testSignalResult(AppLocalizations.of(context), _testPeakToPeak!)),
+              ),
+            )
+          else
+            RecordingStatsCard(stats: _stats, durationSeconds: samples.length / sampleRateHz),
         ],
       ),
       ),

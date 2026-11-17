@@ -14,6 +14,15 @@ import '../recording/recording_file.dart';
 import '../l10n/app_localizations.dart';
 import 'recordings_screen.dart';               // formatStart
 
+// the calibration check of a test signal recording, for the view screen and the PDF
+String testSignalResult(AppLocalizations t, double measuredMv) {
+  double expected = RecordingInfo.expectedTestPeakToPeakMv;
+  double errorPercent = (measuredMv / expected - 1) * 100;
+  String sign = errorPercent >= 0 ? '+' : '';
+  return t.testSignalResult(expected.toStringAsFixed(3), measuredMv.toStringAsFixed(3),
+      '$sign${errorPercent.toStringAsFixed(1)} %');   // a no-break space: "%" never alone in the next line
+}
+
 // share and delete, used by the list and by the view screen,
 // so both screens do exactly the same
 
@@ -70,6 +79,7 @@ Future<void> shareReport(
   required List<int> events,
   List<Artifact> artifacts = const [],
   required RrStats? stats,
+  double? testPeakToPeakMv,
 }) async {
   AppLocalizations t = AppLocalizations.of(context);
   try {
@@ -87,6 +97,7 @@ Future<void> shareReport(
       beats: beats,
       events: events,
       artifacts: artifacts,
+      testPeakToPeakMv: testPeakToPeakMv,
       stats: stats,
       sampleRateHz: sampleRateHz,
     );
