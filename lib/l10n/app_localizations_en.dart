@@ -251,6 +251,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deviceStart => 'START';
 
   @override
+  String get devicePreview => 'PREVIEW';
+
+  @override
+  String get devicePreviewStop => 'STOP PREVIEW';
+
+  @override
+  String get devicePreviewHint =>
+      'Preview only, nothing is saved. START records from this moment on.';
+
+  @override
   String get deviceStop => 'STOP';
 
   @override

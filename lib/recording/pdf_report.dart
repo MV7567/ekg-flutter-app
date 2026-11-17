@@ -186,16 +186,17 @@ class PdfReport {
           ),
 
         // events after the first minute: a strip around each, the same paper and gain
-        if (extra.isNotEmpty) ...[
-          pw.SizedBox(height: 3 * mm),
-          pw.Text(t.reportEventStrips, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
-          pw.SizedBox(height: 2 * mm),
-        ],
-        for (var (event, from) in extra)
+        // the heading is inside the first Inseparable, so it never stays alone at the bottom of a page
+        for (var (index, (event, from)) in extra.indexed)
           pw.Inseparable(
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
+                if (index == 0) ...[
+                  pw.SizedBox(height: 3 * mm),
+                  pw.Text(t.reportEventStrips, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                  pw.SizedBox(height: 2 * mm),
+                ],
                 pw.Text(t.reportEventStrip(time(event), time(from), time(from + samplesPerStrip)),
                     style: const pw.TextStyle(fontSize: 8)),
                 _strip(millivolts, from, samplesPerStrip, beats, events, gain, sampleRateHz),

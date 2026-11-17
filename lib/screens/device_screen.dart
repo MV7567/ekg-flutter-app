@@ -65,6 +65,9 @@ class _DeviceScreenState extends State<DeviceScreen> {
   bool _isConnecting = false; // true while connect() is running (the plugin has no "connecting" state on Android)
   bool _isRecording = false;
   bool _isBusy = false;       // true while a start/stop command is being sent
+  // preview: the ESP32 measures and the chart, heart rate and signal quality work,
+  // but nothing is written to a file (checking the electrodes before START)
+  bool _isPreviewing = false;
   // _isRecording says whether there is a recording in progress, whether the packets end up in the file and which label is on the button depend on this
   // _isBusy is set during sending the start/stop command, the button is turned off then
 
@@ -175,6 +178,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
         // so the file is closed here to keep the data recorded so far
         _controlCharacteristic = null;
         _stopRssiReading();
+        if (_isPreviewing) _endPreview();
         if (_isRecording) {
           // if saving failed, _finishRecording already showed a warning
           if (await _finishRecording()) _showMessage((t) => t.deviceConnectionLost);
@@ -334,16 +338,29 @@ class _DeviceScreenState extends State<DeviceScreen> {
     int seconds = AppSettings.instance.recordingSeconds;
     _sampleLimit = seconds > 0 ? seconds * sampleRateHz : null;
 
-    _decoder.reset();
-    _chartBuffer.clear();   // the chart starts empty for every recording
-    _displayFilter.reset(); // and the filters forget the previous recording
-    _spikeRemover.reset();
-    _heartRate.reset();     // and the beat detector too
+    // from the preview: the ESP32 already measures, the recording simply starts with the next packet
+    // (no STOP + START: no gap, and the signal and the filters have already settled)
+    if (_isPreviewing) {
+      _decoder.reset();       // the next packet becomes sample 0 of the file, whatever its number is
+      _heartRate.reset();     // it counts in sample numbers, they start again from 0
+      _recordingBeats.clear();
+      _eventCount = 0;
+      _bpm.value = null;
+      _isPreviewing = false;
+      _isRecording = true;
+      _uiTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+        if (mounted) setState(() {});
+      });
+      if (mounted) setState(() => _isBusy = false);
+      return;
+    }
+
+    // the chart starts empty for every recording
+    // and the filters forget the previous recording
+    // and the beat detector too
+    _resetSignalProcessing();
     _recordingBeats.clear();
     _eventCount = 0;
-    _bpm.value = null;
-    _qualityMonitor.reset();
-    _quality.value = SignalQuality.checking;
     _isRecording = true;   // set before the command, so the first packet is not ignored
     // the screen doesn't go dark during the recording, otherwise the person reaches for the phone
     // and moves the electrodes / cables (= artifacts), every end of a recording turns it back off
@@ -404,14 +421,65 @@ class _DeviceScreenState extends State<DeviceScreen> {
   }
   
 
+  // the same as START, but without a file
+  Future<void> _startPreview() async {
+    if (_controlCharacteristic == null && !_isTestSignal) return;
+    setState(() => _isBusy = true);
+    _resetSignalProcessing();
+    _isPreviewing = true;   // before the command, so the first packet is not ignored
+    _setKeepScreenOn(true);
+    try {
+      if (_testSignal != null) {
+        _testSignal.start();
+      } else {
+        await _controlCharacteristic!.write([controlStart]);
+      }
+    } catch (e) {
+      debugPrint("Preview start error: $e");
+      _showMessage((t) => t.deviceStartError);
+      _endPreview();
+    }
+    if (mounted) setState(() => _isBusy = false);
+  }
+
+  Future<void> _stopPreview() async {
+    setState(() => _isBusy = true);
+    _testSignal?.stop();
+    try {
+      await _controlCharacteristic?.write([controlStop]);
+    } catch (e) {
+      debugPrint("Preview stop error: $e");
+    }
+    _endPreview();
+    if (mounted) setState(() => _isBusy = false);
+  }
+
+  // packets arriving after this are ignored (like after _finishRecording)
+  void _endPreview() {
+    _isPreviewing = false;
+    _setKeepScreenOn(false);
+    if (mounted) setState(() {});
+  }
+
+  // the counters, the chart, the filters and the detectors start from zero
+  // (a new recording or a new preview)
+  void _resetSignalProcessing() {
+    _decoder.reset();
+    _chartBuffer.clear();
+    _displayFilter.reset();
+    _spikeRemover.reset();
+    _heartRate.reset();
+    _bpm.value = null;
+    _qualityMonitor.reset();
+    _quality.value = SignalQuality.checking;
+  }
+
   // the screen stays on (true) or may turn off by itself again (false),
   // a failure (e.g. a phone without this feature) only costs the feature, the recording goes on
   void _setKeepScreenOn(bool on) {
     WakelockPlus.toggle(enable: on).catchError((e) => debugPrint("Wakelock error: $e"));
   }
 
-  // stops writing and closes the file, packets arriving after this are ignored
-  // returns false if the file could not be written completely
   // the event button: marks the newest sample in the file, shown later on the recording chart
   void _markEvent() {
     int sample = _decoder.sampleCount - 1;   // the last sample received
@@ -421,6 +489,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
     _showMessage((t) => t.deviceEventSaved(DeviceScreen.durationLabel(sample ~/ sampleRateHz)));
   }
 
+  // stops writing and closes the file, packets arriving after this are ignored
+  // returns false if the file could not be written completely
   Future<bool> _finishRecording() async {
     _isRecording = false;
     _setKeepScreenOn(false);   // the phone may go dark again as usual
@@ -448,7 +518,9 @@ class _DeviceScreenState extends State<DeviceScreen> {
   void _processEkgData(List<int> data) {
     // ignore data when not recording (e.g. a last packet arriving right after stop)
     // checking isOpen is the second safety measure in case the file closes for a different place.
-    if (!_isRecording || !_recorder.isOpen) return;
+    // the preview gets the chart, heart rate and quality, but no file
+    bool toFile = _isRecording && _recorder.isOpen;
+    if (!toFile && !_isPreviewing) return;
 
     EkgPacket? packet = _decoder.decode(data);
     if (packet == null) {
@@ -464,9 +536,9 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
     for (int i = 0; i < packet.rawValues.length; i++) {
       // timed recording: samples after the chosen length are not saved, the file is exactly 30 s etc.
-      if (_sampleLimit != null && packet.firstSampleIndex + i >= _sampleLimit!) break;
+      if (toFile && _sampleLimit != null && packet.firstSampleIndex + i >= _sampleLimit!) break;
       int rawValue = packet.rawValues[i];
-      _recorder.writeSample(packet.firstSampleIndex + i, rawValue);   // raw value to the file
+      if (toFile) _recorder.writeSample(packet.firstSampleIndex + i, rawValue);   // raw value to the file
       // the file got the raw value above, from here on a broken single sample is replaced
       double millivolts = _spikeRemover.process(rawValue * millivoltsPerLsb);
       double filtered = _displayFilter.process(millivolts);
@@ -474,7 +546,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
       // and for the beat detector, true = this sample finished a beat
       if (_heartRate.addSample(packet.firstSampleIndex + i, filtered)) {
         _beatCount.value++;
-        _recordingBeats.add(_heartRate.lastBeat!);
+        if (toFile) _recordingBeats.add(_heartRate.lastBeat!);
         if (AppSettings.instance.beepOnBeat) BeatBeep.play();   // not awaited, the samples don't wait for the sound
       }
       _qualityMonitor.addSample(millivolts, filtered);   // raw for "electrode off", filtered for the rest
@@ -499,7 +571,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
     // the chosen length is reached -> stop like the STOP button,
     // !_isBusy: the next packets arrive while stopping, stop only once
-    if (_sampleLimit != null && _decoder.sampleCount >= _sampleLimit! && !_isBusy) {
+    if (toFile && _sampleLimit != null && _decoder.sampleCount >= _sampleLimit! && !_isBusy) {
       _finishTimedRecording();
     }
   }
@@ -758,6 +830,25 @@ class _DeviceScreenState extends State<DeviceScreen> {
                       ),
                     ),
                     // all the properties depend on _isRecording so the button always matches the state
+
+                  // preview: the live signal without a file, to check the electrodes before START
+                  if (ready && !_isRecording) ...[
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: _isBusy ? null : (_isPreviewing ? _stopPreview : _startPreview),
+                      icon: Icon(_isPreviewing ? Icons.visibility_off : Icons.visibility),
+                      label: Text(_isPreviewing ? t.devicePreviewStop : t.devicePreview),
+                    ),
+                    if (_isPreviewing) ...[
+                      const SizedBox(height: 10),
+                      HeartRateText(bpm: _bpm, beats: _beatCount, fontSize: 28),
+                      const SizedBox(height: 6),
+                      SignalQualityText(quality: _quality),
+                      const SizedBox(height: 6),
+                      Text(t.devicePreviewHint, textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                    ],
+                  ],
 
                   // recording info, only visible during the recording, 
                   if (_isRecording) ...[

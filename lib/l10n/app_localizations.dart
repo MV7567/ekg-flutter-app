@@ -542,6 +542,24 @@ abstract class AppLocalizations {
   /// **'START'**
   String get deviceStart;
 
+  /// No description provided for @devicePreview.
+  ///
+  /// In en, this message translates to:
+  /// **'PREVIEW'**
+  String get devicePreview;
+
+  /// No description provided for @devicePreviewStop.
+  ///
+  /// In en, this message translates to:
+  /// **'STOP PREVIEW'**
+  String get devicePreviewStop;
+
+  /// No description provided for @devicePreviewHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview only, nothing is saved. START records from this moment on.'**
+  String get devicePreviewHint;
+
   /// No description provided for @deviceStop.
   ///
   /// In en, this message translates to:

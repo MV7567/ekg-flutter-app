@@ -252,6 +252,16 @@ class AppLocalizationsPl extends AppLocalizations {
   String get deviceStart => 'START';
 
   @override
+  String get devicePreview => 'PODGLĄD';
+
+  @override
+  String get devicePreviewStop => 'ZATRZYMAJ PODGLĄD';
+
+  @override
+  String get devicePreviewHint =>
+      'Tylko podgląd, nic nie jest zapisywane. START nagrywa od tej chwili.';
+
+  @override
   String get deviceStop => 'STOP';
 
   @override
