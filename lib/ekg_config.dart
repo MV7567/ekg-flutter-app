@@ -29,6 +29,7 @@ const int packetLength = 1 + samplesPerPacket * 2;
 const int packetLengthWithFlags = packetLength + 1;
 const int flagLeadOffP = 0x01;     // the electrode on CH1+ was off during this packet
 const int flagLeadOffN = 0x02;     // the electrode on CH1- was off during this packet
+// (both lead-off flags are not used by the app: unreliable on this board, see device_screen.dart)
 const int flagTestSignal = 0x80;   // the packet is the internal test signal, not the electrodes
 
 // ADS1194 CONFIG1 = 0x05 -> 250 samples per second

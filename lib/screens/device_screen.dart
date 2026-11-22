@@ -70,10 +70,6 @@ class _DeviceScreenState extends State<DeviceScreen> {
   bool _isPreviewing = false;
   // the preview measures the internal test signal of the ADS1194, not the electrodes (advanced features)
   bool _isAdsTest = false;
-  // packets with an electrode off (the lead-off bits of the firmware), and all packets, of this recording:
-  // mostly off = no average heart rate in the file (it would be counted from noise)
-  int _leadOffPackets = 0;
-  int _recordedPackets = 0;
   // the test signal mark is already in the file (it is written once)
   bool _testSignalMarked = false;
   // _isRecording says whether there is a recording in progress, whether the packets end up in the file and which label is on the button depend on this
@@ -354,8 +350,6 @@ class _DeviceScreenState extends State<DeviceScreen> {
       _heartRate.reset();     // it counts in sample numbers, they start again from 0
       _recordingBeats.clear();
       _eventCount = 0;
-      _leadOffPackets = 0;
-      _recordedPackets = 0;
       _testSignalMarked = false;
       _bpm.value = null;
       _isPreviewing = false;
@@ -373,8 +367,6 @@ class _DeviceScreenState extends State<DeviceScreen> {
     _resetSignalProcessing();
     _recordingBeats.clear();
     _eventCount = 0;
-    _leadOffPackets = 0;
-    _recordedPackets = 0;
     _testSignalMarked = false;
     _isRecording = true;   // set before the command, so the first packet is not ignored
     // the screen doesn't go dark during the recording, otherwise the person reaches for the phone
@@ -507,10 +499,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
     _showMessage((t) => t.deviceEventSaved(DeviceScreen.durationLabel(sample ~/ sampleRateHz)));
   }
 
-  // the average heart rate for the footer, null if the electrodes were off for more than half
-  // of the recording (the firmware reports it), otherwise noise would give e.g. "143 bpm"
+  // the average heart rate for the footer
   int? _averageBpmForFile() {
-    if (_recordedPackets > 0 && _leadOffPackets * 2 > _recordedPackets) return null;
     if (_testSignalMarked) return null;   // the edges of the test square are not heart beats
     return HeartRateDetector.averageBpm(_recordingBeats, sampleRateHz);
   }
@@ -600,13 +590,9 @@ class _DeviceScreenState extends State<DeviceScreen> {
     int lastSample = packet.firstSampleIndex + packet.rawValues.length - 1;
     _quality.value = _qualityMonitor.update(lastBeat == null ? null : lastSample - lastBeat,
         rhythmSteady: _heartRate.rhythmSteady);
-    // the hardware lead-off detection of the firmware is surer than the guess from the samples
-    bool leadOff = packet.flags & (flagLeadOffP | flagLeadOffN) != 0;
-    if (leadOff) _quality.value = SignalQuality.electrodeOff;
-    if (toFile) {
-      _recordedPackets++;
-      if (leadOff) _leadOffPackets++;
-    }
+    // the lead-off bits of the packet are NOT used: on this board they gave false alarms from
+    // the 50 Hz mains hum and nothing with the jack unplugged (tested 2026-11-22), the firmware
+    // has the detection switched off, the quality comes only from the signal itself
 
     // the chosen length is reached -> stop like the STOP button,
     // !_isBusy: the next packets arrive while stopping, stop only once
@@ -900,10 +886,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
                   if (_isRecording) ...[
                     const SizedBox(height: 30),
                     Text(_recordingTime, style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold)),
-                    HeartRateText(bpm: _bpm, beats: _beatCount, fontSize: 28),
-                    const SizedBox(height: 6),
-                    SignalQualityText(quality: _quality),   // good / noisy / electrode off ...
-                    // timed recording: how much of the chosen length is done
+                    // timed recording: how much of the chosen length is done, right under the time
+                    // ("00:13" / "of 1 min"), so the quality warning never comes between them
                     if (_sampleLimit != null) ...[
                       Text(t.deviceOfLength(DeviceScreen.durationLabel(_sampleLimit! ~/ sampleRateHz))),
                       const SizedBox(height: 6),
@@ -913,7 +897,11 @@ class _DeviceScreenState extends State<DeviceScreen> {
                           value: (_decoder.sampleCount / _sampleLimit!).clamp(0.0, 1.0),   // 0..1
                         ),
                       ),
+                      const SizedBox(height: 10),
                     ],
+                    HeartRateText(bpm: _bpm, beats: _beatCount, fontSize: 28),
+                    const SizedBox(height: 6),
+                    SignalQualityText(quality: _quality),   // good / noisy / electrode off ...
                     const SizedBox(height: 10),
                     // marks a moment in the file (cough, standing up...), shown later on the chart
                     OutlinedButton.icon(
