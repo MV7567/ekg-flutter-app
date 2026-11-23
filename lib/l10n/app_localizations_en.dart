@@ -625,4 +625,76 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get instrLength4 =>
       'Choose the length next to the START button, the recording stops by itself.';
+
+  @override
+  String get rhythmTitle => 'Rhythm';
+
+  @override
+  String get rhythmNormal => 'Heart rate in the normal range (60–100 bpm)';
+
+  @override
+  String get rhythmSlow => 'Slow heart rate (below 60 bpm, bradycardia)';
+
+  @override
+  String get rhythmFast => 'Fast heart rate (above 100 bpm, tachycardia)';
+
+  @override
+  String rhythmPremature(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count premature beats (extra beats that came too early)',
+      one: '1 premature beat (an extra beat that came too early)',
+      zero: 'No premature beats found',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get rhythmHint =>
+      'A simple check from the timing of the beats only, not a diagnosis: it finds about half of the premature beats, and a slow heart rate at rest can be normal in fit people. The QRS width from one lead can be shorter than in a hospital 12-lead ECG. Show an unusual result to a doctor.';
+
+  @override
+  String get viewPremature => 'Premature beats:';
+
+  @override
+  String viewMoreChips(int count) {
+    return '+$count more';
+  }
+
+  @override
+  String qrsTypical(int ms) {
+    return 'Typical QRS width: $ms ms (wide from 120 ms)';
+  }
+
+  @override
+  String qrsTypicalWide(int ms) {
+    return 'Typical QRS width: $ms ms, a wide QRS (120 ms or more)';
+  }
+
+  @override
+  String get qrsNotMeasured =>
+      'QRS width: not measured (too few regular beats or too much noise)';
+
+  @override
+  String rhythmPrematureWide(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count of them with a wide QRS (probably from the ventricles)',
+      one: '1 of them with a wide QRS (probably from the ventricles)',
+      zero: 'none of them with a wide QRS (probably from the atria)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String qrsMedianBeat(int count) {
+    return 'The median beat of $count regular beats, the QRS is marked';
+  }
+
+  @override
+  String viewPrematureWide(String time) {
+    return '$time wide';
+  }
 }

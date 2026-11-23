@@ -626,4 +626,81 @@ class AppLocalizationsPl extends AppLocalizations {
   @override
   String get instrLength4 =>
       'Długość wybierz obok przycisku START, nagranie zatrzyma się samo.';
+
+  @override
+  String get rhythmTitle => 'Rytm';
+
+  @override
+  String get rhythmNormal => 'Tętno w normie (60–100 bpm)';
+
+  @override
+  String get rhythmSlow => 'Wolne tętno (poniżej 60 bpm, bradykardia)';
+
+  @override
+  String get rhythmFast => 'Szybkie tętno (powyżej 100 bpm, tachykardia)';
+
+  @override
+  String rhythmPremature(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count pobudzeń przedwczesnych (dodatkowych uderzeń, które przyszły za wcześnie)',
+      few:
+          '$count pobudzenia przedwczesne (dodatkowe uderzenia, które przyszły za wcześnie)',
+      one:
+          '1 pobudzenie przedwczesne (dodatkowe uderzenie, które przyszło za wcześnie)',
+      zero: 'Nie znaleziono pobudzeń przedwczesnych',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get rhythmHint =>
+      'Prosta ocena wyłącznie na podstawie odstępów między uderzeniami, nie diagnoza: wykrywa ok. połowę pobudzeń przedwczesnych, a wolne tętno w spoczynku może być normalne u osób wytrenowanych. Szerokość QRS z jednego odprowadzenia może wyjść mniejsza niż w szpitalnym EKG 12-odprowadzeniowym. Nietypowy wynik warto skonsultować z lekarzem.';
+
+  @override
+  String get viewPremature => 'Pobudzenia przedwczesne:';
+
+  @override
+  String viewMoreChips(int count) {
+    return '+$count więcej';
+  }
+
+  @override
+  String qrsTypical(int ms) {
+    return 'Typowa szerokość QRS: $ms ms (szeroki od 120 ms)';
+  }
+
+  @override
+  String qrsTypicalWide(int ms) {
+    return 'Typowa szerokość QRS: $ms ms, poszerzony QRS (120 ms lub więcej)';
+  }
+
+  @override
+  String get qrsNotMeasured =>
+      'Szerokość QRS: nie zmierzono (za mało regularnych uderzeń albo za dużo zakłóceń)';
+
+  @override
+  String rhythmPrematureWide(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'w tym $count z szerokim QRS (prawdopodobnie komorowe)',
+      few: 'w tym $count z szerokim QRS (prawdopodobnie komorowe)',
+      one: 'w tym 1 z szerokim QRS (prawdopodobnie komorowe)',
+      zero: 'żadne z szerokim QRS (prawdopodobnie nadkomorowe)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String qrsMedianBeat(int count) {
+    return 'Uśrednione uderzenie (mediana $count regularnych uderzeń), zaznaczony QRS';
+  }
+
+  @override
+  String viewPrematureWide(String time) {
+    return '$time szeroki';
+  }
 }

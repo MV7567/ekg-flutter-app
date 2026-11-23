@@ -182,5 +182,19 @@
   "instrLength1": "10 s: szybki podgląd, tyle samo co szpitalne 12-odprowadzeniowe EKG.",
   "instrLength2": "30 s – 1 min: zalecane, wystarczająco dużo uderzeń, by ocenić rytm.",
   "instrLength3": "5 min: do analizy zmienności rytmu serca (HRV).",
-  "instrLength4": "Długość wybierz obok przycisku START, nagranie zatrzyma się samo."
+  "instrLength4": "Długość wybierz obok przycisku START, nagranie zatrzyma się samo.",
+  "rhythmTitle": "Rytm",
+  "rhythmNormal": "Tętno w normie (60–100 bpm)",
+  "rhythmSlow": "Wolne tętno (poniżej 60 bpm, bradykardia)",
+  "rhythmFast": "Szybkie tętno (powyżej 100 bpm, tachykardia)",
+  "rhythmPremature": "{count, plural, =0{Nie znaleziono pobudzeń przedwczesnych} =1{1 pobudzenie przedwczesne (dodatkowe uderzenie, które przyszło za wcześnie)} few{{count} pobudzenia przedwczesne (dodatkowe uderzenia, które przyszły za wcześnie)} other{{count} pobudzeń przedwczesnych (dodatkowych uderzeń, które przyszły za wcześnie)}}",
+  "rhythmHint": "Prosta ocena wyłącznie na podstawie odstępów między uderzeniami, nie diagnoza: wykrywa ok. połowę pobudzeń przedwczesnych, a wolne tętno w spoczynku może być normalne u osób wytrenowanych. Szerokość QRS z jednego odprowadzenia może wyjść mniejsza niż w szpitalnym EKG 12-odprowadzeniowym. Nietypowy wynik warto skonsultować z lekarzem.",
+  "viewPremature": "Pobudzenia przedwczesne:",
+  "viewMoreChips": "+{count} więcej",
+  "qrsTypical": "Typowa szerokość QRS: {ms} ms (szeroki od 120 ms)",
+  "qrsTypicalWide": "Typowa szerokość QRS: {ms} ms, poszerzony QRS (120 ms lub więcej)",
+  "qrsNotMeasured": "Szerokość QRS: nie zmierzono (za mało regularnych uderzeń albo za dużo zakłóceń)",
+  "rhythmPrematureWide": "{count, plural, =0{żadne z szerokim QRS (prawdopodobnie nadkomorowe)} =1{w tym 1 z szerokim QRS (prawdopodobnie komorowe)} few{w tym {count} z szerokim QRS (prawdopodobnie komorowe)} other{w tym {count} z szerokim QRS (prawdopodobnie komorowe)}}",
+  "qrsMedianBeat": "Uśrednione uderzenie (mediana {count} regularnych uderzeń), zaznaczony QRS",
+  "viewPrematureWide": "{time} szeroki"
 }

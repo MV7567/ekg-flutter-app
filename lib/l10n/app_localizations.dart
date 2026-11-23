@@ -1141,6 +1141,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Choose the length next to the START button, the recording stops by itself.'**
   String get instrLength4;
+
+  /// No description provided for @rhythmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rhythm'**
+  String get rhythmTitle;
+
+  /// No description provided for @rhythmNormal.
+  ///
+  /// In en, this message translates to:
+  /// **'Heart rate in the normal range (60–100 bpm)'**
+  String get rhythmNormal;
+
+  /// No description provided for @rhythmSlow.
+  ///
+  /// In en, this message translates to:
+  /// **'Slow heart rate (below 60 bpm, bradycardia)'**
+  String get rhythmSlow;
+
+  /// No description provided for @rhythmFast.
+  ///
+  /// In en, this message translates to:
+  /// **'Fast heart rate (above 100 bpm, tachycardia)'**
+  String get rhythmFast;
+
+  /// Number of premature beats found in the recording
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No premature beats found} =1{1 premature beat (an extra beat that came too early)} other{{count} premature beats (extra beats that came too early)}}'**
+  String rhythmPremature(int count);
+
+  /// No description provided for @rhythmHint.
+  ///
+  /// In en, this message translates to:
+  /// **'A simple check from the timing of the beats only, not a diagnosis: it finds about half of the premature beats, and a slow heart rate at rest can be normal in fit people. The QRS width from one lead can be shorter than in a hospital 12-lead ECG. Show an unusual result to a doctor.'**
+  String get rhythmHint;
+
+  /// No description provided for @viewPremature.
+  ///
+  /// In en, this message translates to:
+  /// **'Premature beats:'**
+  String get viewPremature;
+
+  /// No description provided for @viewMoreChips.
+  ///
+  /// In en, this message translates to:
+  /// **'+{count} more'**
+  String viewMoreChips(int count);
+
+  /// No description provided for @qrsTypical.
+  ///
+  /// In en, this message translates to:
+  /// **'Typical QRS width: {ms} ms (wide from 120 ms)'**
+  String qrsTypical(int ms);
+
+  /// No description provided for @qrsTypicalWide.
+  ///
+  /// In en, this message translates to:
+  /// **'Typical QRS width: {ms} ms, a wide QRS (120 ms or more)'**
+  String qrsTypicalWide(int ms);
+
+  /// No description provided for @qrsNotMeasured.
+  ///
+  /// In en, this message translates to:
+  /// **'QRS width: not measured (too few regular beats or too much noise)'**
+  String get qrsNotMeasured;
+
+  /// No description provided for @rhythmPrematureWide.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{none of them with a wide QRS (probably from the atria)} =1{1 of them with a wide QRS (probably from the ventricles)} other{{count} of them with a wide QRS (probably from the ventricles)}}'**
+  String rhythmPrematureWide(int count);
+
+  /// No description provided for @qrsMedianBeat.
+  ///
+  /// In en, this message translates to:
+  /// **'The median beat of {count} regular beats, the QRS is marked'**
+  String qrsMedianBeat(int count);
+
+  /// Chip of a premature beat with a wide QRS
+  ///
+  /// In en, this message translates to:
+  /// **'{time} wide'**
+  String viewPrematureWide(String time);
 }
 
 class _AppLocalizationsDelegate

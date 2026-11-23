@@ -70,12 +70,25 @@ Float64List readLead0(String path, Header h) {
   return mv;
 }
 
+// one annotation: its time (in samples), its code and the rhythm at that moment
+// ("(N" normal sinus, "(AFIB" atrial fibrillation, "(B" bigeminy ..., "" before the first one)
+class Annotation {
+  Annotation(this.time, this.code, this.rhythm);
+  final int time, code;
+  final String rhythm;
+}
+
+const int rhythmCode = 28;   // a rhythm change, the rhythm name is in its AUX text
+
 // MIT annotation format: 16-bit little-endian words, code = top 6 bits, time step = low 10 bits
-// special codes: 59 SKIP (a 32-bit time step follows), 60-62 NUM/SUB/CHN, 63 AUX (text follows)
-List<int> readBeatTimes(String path) {
+// special codes: 59 SKIP (a 32-bit time step follows), 60-62 NUM/SUB/CHN, 63 AUX (text follows,
+// it belongs to the annotation before it)
+List<Annotation> readAnnotations(String path) {
   Uint8List b = File(path).readAsBytesSync();
-  List<int> beats = [];
+  List<Annotation> annotations = [];
   int time = 0;
+  int lastCode = -1;
+  String rhythm = '';
   int i = 0;
   while (i + 1 < b.length) {
     int word = b[i] | (b[i + 1] << 8);
@@ -89,16 +102,23 @@ List<int> readBeatTimes(String path) {
       time += (high << 16) | low;
       i += 4;
     } else if (code == 63) {              // AUX: step = the length of the text, padded to even
+      if (lastCode == rhythmCode) {
+        rhythm = String.fromCharCodes(b.sublist(i, i + step)).replaceAll('\x00', '').trim();
+      }
       i += step + (step & 1);
     } else if (code >= 60) {
       // NUM, SUB, CHN: only change a field of the current annotation
     } else {
       time += step;
-      if (beatCodes.contains(code)) beats.add(time);
+      lastCode = code;
+      annotations.add(Annotation(time, code, rhythm));
     }
   }
-  return beats;
+  return annotations;
 }
+
+List<int> readBeatTimes(String path) =>
+    [for (Annotation a in readAnnotations(path)) if (beatCodes.contains(a.code)) a.time];
 
 // linear interpolation from the original rate to 250 Hz
 Float64List resample(Float64List x, double fromRate) {
@@ -114,12 +134,13 @@ Float64List resample(Float64List x, double fromRate) {
 }
 
 // the app pipeline for a saved recording (see RecordingInfo.filterMillivolts and loadForView)
-List<int> detect(Float64List mv) {
+List<double> filterLikeApp(Float64List mv) {
   EkgDisplayFilter filter = EkgDisplayFilter(targetRate.toDouble());
   SpikeRemover spikes = SpikeRemover();
-  List<double> filtered = [for (double x in mv) filter.process(spikes.process(x))];
-  return HeartRateDetector.findBeats(filtered, targetRate);
+  return [for (double x in mv) filter.process(spikes.process(x))];
 }
+
+List<int> detect(Float64List mv) => HeartRateDetector.findBeats(filterLikeApp(mv), targetRate);
 
 class Result {
   Result(this.record, this.lead, this.tp, this.fn, this.fp);

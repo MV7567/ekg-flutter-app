@@ -10,6 +10,8 @@ import 'package:ecg_ble_app/heart_rate_detector.dart';
 import 'package:ecg_ble_app/l10n/app_localizations.dart';
 import 'package:ecg_ble_app/recording/pdf_report.dart';
 import 'package:ecg_ble_app/screens/recording_actions.dart';
+import 'package:ecg_ble_app/qrs_width.dart';
+import 'package:ecg_ble_app/rhythm_analysis.dart';
 import 'package:ecg_ble_app/rr_stats.dart';
 
 const int fs = 250;
@@ -66,11 +68,21 @@ void main() {
 
     Float32List mv = filteredEkg(70, scale: 0.3);   // 70 s: more than 10 strips, small QRS
     List<int> beats = HeartRateDetector.findBeats(mv, fs);
+    List<int> bigeminy = [fs];
+    for (int rr in [...List.filled(10, 200), for (int k = 0; k < 25; k++) ...[130, 270]]) {
+      bigeminy.add(bigeminy.last + rr);
+    }
+    expect(RhythmAnalysis.findPremature(bigeminy, fs).length, 25);
     Uint8List full = await PdfReport.build(
       t: t, regular: regular, bold: bold,
       start: DateTime(2026, 11, 12, 16, 25), deviceName: 'ESP32_EKG', note: 'spoczynek, zażółć gęślą jaźń',
       millivolts: mv, beats: beats, events: [5 * fs, 42 * fs, 66 * fs],
       artifacts: [Artifact(20 * fs, 22 * fs), Artifact(65 * fs, 66 * fs)], stats: RrStats.fromBeats(beats, fs), sampleRateHz: fs,
+      // more premature beats than fit in the info line, some on the strips
+      // (bigeminy: 10 normal intervals of 200 samples, then 25 x early 130 + pause 270 = 25 premature)
+      rhythm: RhythmAnalysis.analyze(bigeminy, fs, 52),
+      // the median beat of the test EKG, a few of the premature beats marked as wide
+      qrs: QrsSummary.analyze(mv, beats, fs, premature: bigeminy.take(15).toList()),
     );
     expect(String.fromCharCodes(full.sublist(0, 5)), '%PDF-');
 

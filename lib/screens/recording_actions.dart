@@ -7,6 +7,8 @@ import 'package:pdf/widgets.dart' as pw;       // pw.Font
 import 'package:share_plus/share_plus.dart';   // the Android share sheet
 import '../ekg_config.dart';                   // sampleRateHz
 import '../recording/pdf_report.dart';
+import '../qrs_width.dart';
+import '../rhythm_analysis.dart';
 import '../rr_stats.dart';
 import '../artifact_detector.dart';            // Artifact
 import '../recording/csv_recorder.dart';       // updateMediaStore
@@ -79,6 +81,8 @@ Future<void> shareReport(
   required List<int> events,
   List<Artifact> artifacts = const [],
   required RrStats? stats,
+  RhythmAnalysis? rhythm,
+  QrsSummary? qrs,
   double? testPeakToPeakMv,
 }) async {
   AppLocalizations t = AppLocalizations.of(context);
@@ -99,6 +103,8 @@ Future<void> shareReport(
       artifacts: artifacts,
       testPeakToPeakMv: testPeakToPeakMv,
       stats: stats,
+      rhythm: rhythm,
+      qrs: qrs,
       sampleRateHz: sampleRateHz,
     );
     // ekg_2026-11-12_16-25-25.csv -> ekg_2026-11-12_16-25-25_report.pdf

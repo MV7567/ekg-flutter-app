@@ -19,6 +19,7 @@ class EkgChart extends StatefulWidget {
     this.beatMarkers,
     this.eventMarkers,
     this.artifactMarkers,
+    this.prematureMarkers,
   });
 
 // final: cannot be changed after the constructor, required: must be given when creating the widget
@@ -34,11 +35,16 @@ class EkgChart extends StatefulWidget {
   // optional: disturbed parts found automatically, start / end as positions in the buffer
   // (they can start before the buffer or end after it), an orange band with an orange flag
   final ValueListenable<List<Artifact>>? artifactMarkers;
+  // optional: the premature beats (RhythmAnalysis), positions in the buffer like beatMarkers,
+  // a bigger purple triangle over the red one under that R wave
+  final ValueListenable<List<int>>? prematureMarkers;
 
   // blue: different from the red beat triangles, also used by the event button and the chips
   static const Color eventColor = Color(0xFF1E88E5);
   // orange: found by the app, not marked by the person
   static const Color artifactColor = Color(0xFFFB8C00);
+  // purple: a found beat, but a special one (different from red beats, blue events, orange artifacts)
+  static const Color prematureColor = Color(0xFF8E24AA);
 
   // the mvPerBigSquare value that means "Auto" (a real scale is never 0)
   static const double autoZoom = 0;
@@ -77,7 +83,7 @@ class _EkgChartState extends State<EkgChart> {
     EkgChartColors colors = EkgChartColors.of(context);
     return CustomPaint(
       painter: _EkgPainter(widget.buffer, widget.sampleRateHz, widget.mvPerBigSquare, t, widget.beatMarkers,
-          colors, _autoScale, widget.eventMarkers, widget.artifactMarkers),
+          colors, _autoScale, widget.eventMarkers, widget.artifactMarkers, widget.prematureMarkers),
       size: Size.infinite,   // take all the space the parent gives
     );
   }
@@ -91,8 +97,8 @@ class _EkgPainter extends CustomPainter {
   // size.infite means take up all the space from the parent
   // Listenable.merge: repaint when the buffer OR the markers change
   _EkgPainter(this.buffer, this.sampleRateHz, this.mvPerBigSquare, this.texts, this.beatMarkers, this.colors,
-      this.autoScale, this.eventMarkers, this.artifactMarkers)
-      : super(repaint: Listenable.merge([buffer, beatMarkers, eventMarkers, artifactMarkers]));
+      this.autoScale, this.eventMarkers, this.artifactMarkers, this.prematureMarkers)
+      : super(repaint: Listenable.merge([buffer, beatMarkers, eventMarkers, artifactMarkers, prematureMarkers]));
   // gives the buffer to the constructor, and the painter listens to it (repaint: buffer), so with every notifyListeners() the painter is called and the chart is redrawn
 
   // BLE packet -> _processEkgData -> _chartBuffer.addAll -> notifyListeners() -> repaint: buffer -> _EkgPainter.paint
@@ -107,6 +113,7 @@ class _EkgPainter extends CustomPainter {
   final EkgAutoScale autoScale;  // remembers the Auto step, owned by the chart widget
   final ValueListenable<List<int>>? eventMarkers;
   final ValueListenable<List<Artifact>>? artifactMarkers;
+  final ValueListenable<List<int>>? prematureMarkers;
 
   static const double secondsPerBigSquare = 0.2;  // 1 big square = 0.2 s, 1 small square = 0.04 s (like paper at 25 mm/s)
 
@@ -170,6 +177,7 @@ class _EkgPainter extends CustomPainter {
 
     _drawArtifacts(canvas, size, pxPerSecond / sampleRateHz);
     _drawBeatMarkers(canvas, size, pxPerSecond / sampleRateHz);
+    _drawPrematureMarkers(canvas, size, pxPerSecond / sampleRateHz);
     _drawEventMarkers(canvas, size, pxPerSecond / sampleRateHz);
     String label = EkgChart.scaleLabel(texts, secondsPerBigSquare, scale);
     _drawLabel(canvas, auto ? '$label · ${texts.chartZoomAuto}' : label);
@@ -231,6 +239,22 @@ class _EkgPainter extends CustomPainter {
         ..lineTo(x + 5, size.height)        // bottom right
         ..close();
       canvas.drawPath(triangle, red);
+    }
+  }
+
+  // a bigger purple triangle under every premature beat, it covers the red one of that beat
+  void _drawPrematureMarkers(Canvas canvas, Size size, double xStep) {
+    List<int>? markers = prematureMarkers?.value;
+    if (markers == null || markers.isEmpty) return;
+    Paint purple = Paint()..color = EkgChart.prematureColor;
+    for (int position in markers) {
+      double x = position * xStep;
+      Path triangle = Path()
+        ..moveTo(x, size.height - 16)
+        ..lineTo(x - 8, size.height)
+        ..lineTo(x + 8, size.height)
+        ..close();
+      canvas.drawPath(triangle, purple);
     }
   }
 
@@ -296,6 +320,7 @@ class _EkgPainter extends CustomPainter {
       oldDelegate.beatMarkers != beatMarkers ||
       oldDelegate.eventMarkers != eventMarkers ||
       oldDelegate.artifactMarkers != artifactMarkers ||
+      oldDelegate.prematureMarkers != prematureMarkers ||
       oldDelegate.colors != colors;   // light <-> dark theme
 } // with every build() a new _EkgPainter is created, flutter asks if the new painter is goin gtoi draw something different than the previous one, if not then its skispped
 // new data is taken care of by repaint: buffer, so here e compare only settings, with changing x1/x2/x4 the result is true
