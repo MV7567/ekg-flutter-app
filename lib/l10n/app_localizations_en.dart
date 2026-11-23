@@ -652,7 +652,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get rhythmHint =>
-      'A simple check from the timing of the beats only, not a diagnosis: it finds about half of the premature beats, and a slow heart rate at rest can be normal in fit people. The QRS width from one lead can be shorter than in a hospital 12-lead ECG. Show an unusual result to a doctor.';
+      'An automatic check from one lead: it finds about 2 of 3 premature beats, the QRS width and the QT can differ from a hospital 12-lead ECG, and a slow heart rate at rest can be normal in fit people. Show an unusual result to a doctor.';
 
   @override
   String get viewPremature => 'Premature beats:';
@@ -681,9 +681,12 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count of them with a wide QRS (probably from the ventricles)',
-      one: '1 of them with a wide QRS (probably from the ventricles)',
-      zero: 'none of them with a wide QRS (probably from the atria)',
+      other:
+          '$count of them with another QRS shape or a wide QRS (probably from the ventricles)',
+      one:
+          '1 of them with another QRS shape or a wide QRS (probably from the ventricles)',
+      zero:
+          'none of them with another QRS shape or a wide QRS (probably from the atria)',
     );
     return '$_temp0';
   }
@@ -695,6 +698,70 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String viewPrematureWide(String time) {
-    return '$time wide';
+    return '$time ventricular';
   }
+
+  @override
+  String afSuspected(int seconds) {
+    return 'Irregular rhythm for $seconds s: possible atrial fibrillation or very frequent extra beats';
+  }
+
+  @override
+  String get afNone =>
+      'No irregular rhythm typical of atrial fibrillation (30 s or longer)';
+
+  @override
+  String get viewIrregular => 'Irregular rhythm:';
+
+  @override
+  String rhythmRuns(int pairs, int runs) {
+    return 'Ventricular beats in a row: $pairs pairs, $runs runs of 3 or more';
+  }
+
+  @override
+  String get rhythmNoPauses => 'No pauses of 2 s or longer';
+
+  @override
+  String rhythmPauses(int count, double seconds) {
+    final intl.NumberFormat secondsNumberFormat =
+        intl.NumberFormat.decimalPatternDigits(
+          locale: localeName,
+          decimalDigits: 1,
+        );
+    final String secondsString = secondsNumberFormat.format(seconds);
+
+    return 'Pauses of 2 s or longer: $count, the longest $secondsString s';
+  }
+
+  @override
+  String get viewPauses => 'Pauses:';
+
+  @override
+  String viewRun(String time, int count) {
+    return '$time $count in a row';
+  }
+
+  @override
+  String get viewRuns => 'Ventricular in a row:';
+
+  @override
+  String qtValues(int qt, int bazett, int fridericia) {
+    return 'QT $qt ms, QTc $bazett ms (Bazett) / $fridericia ms (Fridericia)';
+  }
+
+  @override
+  String get qtNormal => 'QTc in the normal range (350–460 ms)';
+
+  @override
+  String get qtLong => 'Long QTc (above 460 ms)';
+
+  @override
+  String get qtShort => 'Short QTc (below 350 ms)';
+
+  @override
+  String get qtNotMeasured =>
+      'QT: not measured, the T wave is too flat in this lead (another electrode placement may help)';
+
+  @override
+  String get rhythmWarning => 'This is not a medical diagnosis.';
 }

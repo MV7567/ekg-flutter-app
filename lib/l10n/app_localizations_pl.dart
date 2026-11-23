@@ -657,7 +657,7 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get rhythmHint =>
-      'Prosta ocena wyłącznie na podstawie odstępów między uderzeniami, nie diagnoza: wykrywa ok. połowę pobudzeń przedwczesnych, a wolne tętno w spoczynku może być normalne u osób wytrenowanych. Szerokość QRS z jednego odprowadzenia może wyjść mniejsza niż w szpitalnym EKG 12-odprowadzeniowym. Nietypowy wynik warto skonsultować z lekarzem.';
+      'Automatyczna ocena z jednego odprowadzenia: wykrywa ok. 2 z 3 pobudzeń przedwczesnych, szerokość QRS i QT mogą się różnić od szpitalnego EKG 12-odprowadzeniowego, a wolne tętno w spoczynku bywa normalne u osób wytrenowanych. Nietypowy wynik skonsultuj z lekarzem.';
 
   @override
   String get viewPremature => 'Pobudzenia przedwczesne:';
@@ -686,10 +686,14 @@ class AppLocalizationsPl extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'w tym $count z szerokim QRS (prawdopodobnie komorowe)',
-      few: 'w tym $count z szerokim QRS (prawdopodobnie komorowe)',
-      one: 'w tym 1 z szerokim QRS (prawdopodobnie komorowe)',
-      zero: 'żadne z szerokim QRS (prawdopodobnie nadkomorowe)',
+      other:
+          'w tym $count o innym kształcie lub szerokim QRS (prawdopodobnie komorowe)',
+      few:
+          'w tym $count o innym kształcie lub szerokim QRS (prawdopodobnie komorowe)',
+      one:
+          'w tym 1 o innym kształcie lub szerokim QRS (prawdopodobnie komorowe)',
+      zero:
+          'żadne o innym kształcie lub szerokim QRS (prawdopodobnie nadkomorowe)',
     );
     return '$_temp0';
   }
@@ -701,6 +705,70 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String viewPrematureWide(String time) {
-    return '$time szeroki';
+    return '$time komorowe';
   }
+
+  @override
+  String afSuspected(int seconds) {
+    return 'Nieregularny rytm przez $seconds s: możliwe migotanie przedsionków lub bardzo częste pobudzenia dodatkowe';
+  }
+
+  @override
+  String get afNone =>
+      'Brak nieregularnego rytmu typowego dla migotania przedsionków (30 s lub dłużej)';
+
+  @override
+  String get viewIrregular => 'Nieregularny rytm:';
+
+  @override
+  String rhythmRuns(int pairs, int runs) {
+    return 'Pobudzenia komorowe jedno po drugim: par $pairs, salw (3 lub więcej) $runs';
+  }
+
+  @override
+  String get rhythmNoPauses => 'Brak pauz 2 s lub dłuższych';
+
+  @override
+  String rhythmPauses(int count, double seconds) {
+    final intl.NumberFormat secondsNumberFormat =
+        intl.NumberFormat.decimalPatternDigits(
+          locale: localeName,
+          decimalDigits: 1,
+        );
+    final String secondsString = secondsNumberFormat.format(seconds);
+
+    return 'Pauzy 2 s lub dłuższe: $count, najdłuższa $secondsString s';
+  }
+
+  @override
+  String get viewPauses => 'Pauzy:';
+
+  @override
+  String viewRun(String time, int count) {
+    return '$time $count z rzędu';
+  }
+
+  @override
+  String get viewRuns => 'Komorowe z rzędu:';
+
+  @override
+  String qtValues(int qt, int bazett, int fridericia) {
+    return 'QT $qt ms, QTc $bazett ms (Bazett) / $fridericia ms (Fridericia)';
+  }
+
+  @override
+  String get qtNormal => 'QTc w normie (350–460 ms)';
+
+  @override
+  String get qtLong => 'Wydłużony QTc (powyżej 460 ms)';
+
+  @override
+  String get qtShort => 'Skrócony QTc (poniżej 350 ms)';
+
+  @override
+  String get qtNotMeasured =>
+      'QT: nie zmierzono, załamek T jest zbyt płaski w tym odprowadzeniu (może pomóc inne ułożenie elektrod)';
+
+  @override
+  String get rhythmWarning => 'To nie jest diagnoza medyczna.';
 }

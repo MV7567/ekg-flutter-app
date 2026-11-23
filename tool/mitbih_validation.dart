@@ -52,7 +52,9 @@ Header readHeader(String path) {
   String gainField = signal0[2];
   double gain = double.parse(RegExp(r'^[\d.]+').firstMatch(gainField)!.group(0)!);
   int baseline = int.parse(signal0[4]);   // the ADC zero, the same as the baseline in MIT-BIH
-  return Header(double.parse(record[2]), int.parse(record[3]), gain, baseline, signal0.length > 8 ? signal0[8] : '?');
+  // the sample rate can be "250/360" (QT Database: the sample rate / the counter rate), only the first part counts
+  return Header(double.parse(record[2].split('/').first), int.parse(record[3]), gain, baseline,
+      signal0.length > 8 ? signal0[8] : '?');
 }
 
 // format 212: 2 signals, 12 bits each, packed into 3 bytes per frame

@@ -61,6 +61,7 @@ void main() {
     ValueNotifier<List<int>> beats = ValueNotifier([100, 300]);
     ValueNotifier<List<int>> events = ValueNotifier([200]);
     ValueNotifier<List<int>> premature = ValueNotifier([300]);
+    ValueNotifier<List<(int, int)>> irregular = ValueNotifier([(-500, 400), (1000, 3000)]);
     // a disturbance that started before the window (no flag) and one inside it
     ValueNotifier<List<Artifact>> artifacts = ValueNotifier([const Artifact(-100, 50), const Artifact(600, 900)]);
     addTearDown(buffer.dispose);
@@ -68,9 +69,10 @@ void main() {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: EkgChart(buffer: buffer, sampleRateHz: 250, beatMarkers: beats, eventMarkers: events,
-          artifactMarkers: artifacts, prematureMarkers: premature),
+          artifactMarkers: artifacts, prematureMarkers: premature, irregularMarkers: irregular),
     ));
     premature.value = [];   // the purple triangles follow their notifier too
+    irregular.value = [];
     await tester.pump();
     events.value = [50, 1249];   // moving the window: new positions, the chart repaints by itself
     await tester.pump();

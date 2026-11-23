@@ -3,6 +3,7 @@ import 'dart:typed_data';               // Float32List, Uint8List
 import 'package:pdf/pdf.dart';          // PdfPageFormat, PdfColor, PdfGraphics
 import 'package:pdf/widgets.dart' as pw; // "pw." so its Text, Row... don't mix with Flutter's
 import '../l10n/app_localizations.dart';
+import '../af_detector.dart';
 import '../qrs_width.dart';
 import '../rhythm_analysis.dart';
 import '../rr_stats.dart';
@@ -41,6 +42,8 @@ class PdfReport {
   static const PdfColor _artifactBand = PdfColor.fromInt(0xFFFFE0B2);  // light orange under the grid
   static const PdfColor _artifactColor = PdfColor.fromInt(0xFFFB8C00); // the same orange as in the app
   static const PdfColor _prematureColor = PdfColor.fromInt(0xFF8E24AA); // the same purple as in the app
+  static const PdfColor _irregularBand = PdfColor.fromInt(0xFFC8E6C9);  // light green under the grid
+  static const PdfColor _irregularColor = PdfColor.fromInt(0xFF43A047); // the same green as in the app
   static const PdfColor _qrsColor = PdfColor.fromInt(0xFF00897B);       // the same teal as MedianBeatChart
   static const PdfColor _qrsBand = PdfColor.fromInt(0xFFCCE7E4);        // light teal under the grid
   // at most this many premature beat times in the info line, then "+12 more"
@@ -109,10 +112,12 @@ class PdfReport {
     double? testPeakToPeakMv,          // a test signal recording: its measured amplitude, no heart statistics
     required RrStats? stats,
     RhythmAnalysis? rhythm,            // the rhythm check, null = not checked
-    QrsSummary? qrs,                   // the QRS width and the median beat, null = not checked
+    AfDetector? af,                    // the irregular rhythm episodes, null = not checked
     required int sampleRateHz,
   }) async {
     List<int> premature = rhythm?.prematureBeats ?? const [];
+    QrsSummary? qrs = rhythm?.qrs;      // the QRS width and the median beat, null = not checked
+    List<(int, int)> irregular = af?.episodes ?? const [];
     double mm = PdfPageFormat.mm;   // 1 mm in PDF points (1/72 inch)
     int first = firstStripSample(millivolts.length, sampleRateHz);
     // the gain only from what is on the strips, the settling hump doesn't count
@@ -158,11 +163,17 @@ class PdfReport {
         if (events.isNotEmpty) _info(t.viewEvents, events.map(time).join(', ')),
         if (artifacts.isNotEmpty)
           _info(t.viewArtifacts, artifacts.map((a) => artifactLabel(a, sampleRateHz)).join(', ')),
+        if (irregular.isNotEmpty)
+          _info(t.viewIrregular, irregular.map((e) => '${time(e.$1)}–${time(e.$2)}').join(', ')),
+        if (rhythm?.runs.isNotEmpty ?? false)
+          _info(t.viewRuns, rhythm!.runs.map((r) => t.viewRun(time(r.first), r.length)).join(', ')),
+        if (rhythm?.pauses.isNotEmpty ?? false)
+          _info(t.viewPauses, rhythm!.pauses.map((p) => '${time(p.$1)}–${time(p.$2)}').join(', ')),
         if (premature.isNotEmpty)
           _info(t.viewPremature, [
             // "0:14 szeroki" for a wide QRS, like the chips in the app
             ...premature.take(maxPrematureTimes).map((b) =>
-                qrs?.widePremature.contains(b) ?? false ? t.viewPrematureWide(time(b)) : time(b)),
+                rhythm!.ventricular.contains(b) ? t.viewPrematureWide(time(b)) : time(b)),
             if (premature.length > maxPrematureTimes) t.viewMoreChips(premature.length - maxPrematureTimes),
           ].join(', ')),
         pw.SizedBox(height: 6 * mm),
@@ -204,15 +215,41 @@ class PdfReport {
             pw.SizedBox(height: 4 * mm),
             pw.Text(t.rhythmTitle, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
             pw.SizedBox(height: 2 * mm),
-            for (String line in RecordingStatsCard.rhythmLines(t, rhythm, qrs: qrs)) pw.Text(line),
-            if (qrs?.medianBeat != null) ...[
+            // not a diagnosis: in a red frame, before the findings
+            pw.Container(
+              width: double.infinity,
+              padding: pw.EdgeInsets.all(2.5 * mm),
+              decoration: pw.BoxDecoration(
+                color: PdfColors.red50,
+                border: pw.Border.all(color: PdfColors.red700, width: 1),
+                borderRadius: pw.BorderRadius.circular(1.5 * mm),
+              ),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(t.rhythmWarning,
+                      style: pw.TextStyle(color: PdfColors.red800, fontWeight: pw.FontWeight.bold)),
+                  pw.SizedBox(height: 1 * mm),
+                  pw.Text(t.rhythmHint, style: const pw.TextStyle(fontSize: 8, color: PdfColors.red900)),
+                ],
+              ),
+            ),
+            pw.SizedBox(height: 2 * mm),
+            // every finding as a point of a list
+            for (String line in RecordingStatsCard.rhythmLines(t, rhythm, af: af))
+              pw.Padding(
+                padding: pw.EdgeInsets.only(bottom: 1 * mm),
+                child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                  pw.SizedBox(width: 4 * mm, child: pw.Text('•')),
+                  pw.Expanded(child: pw.Text(line)),
+                ]),
+              ),
+            if (RecordingStatsCard.beatToShow(rhythm) case (List<double> beat, (int, int)? q, int? tEnd)) ...[
               pw.SizedBox(height: 2 * mm),
-              pw.Text(t.qrsMedianBeat(qrs!.beatCount), style: const pw.TextStyle(fontSize: 8)),
+              pw.Text(t.qrsMedianBeat(qrs?.beatCount ?? 0), style: const pw.TextStyle(fontSize: 8)),
               pw.SizedBox(height: 1 * mm),
-              _medianBeat(qrs, sampleRateHz, 60 * mm, stripHeightMm * mm),
+              _medianBeat(beat, q, tEnd, sampleRateHz, 90 * mm, stripHeightMm * mm),
             ],
-            pw.SizedBox(height: 1.5 * mm),
-            pw.Text(t.rhythmHint, style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
           ],
         ],
         ],
@@ -236,7 +273,7 @@ class PdfReport {
                 pw.Text('${time(first + k * samplesPerStrip)} – '
                     '${time(min(first + (k + 1) * samplesPerStrip, millivolts.length))}',
                     style: const pw.TextStyle(fontSize: 8)),
-                _strip(millivolts, first + k * samplesPerStrip, samplesPerStrip, beats, premature, events, artifacts, gain,
+                _strip(millivolts, first + k * samplesPerStrip, samplesPerStrip, beats, premature, irregular, events, artifacts, gain,
                     sampleRateHz),
                 pw.SizedBox(height: 3 * mm),
               ],
@@ -257,7 +294,7 @@ class PdfReport {
                 ],
                 pw.Text(t.reportEventStrip(time(event), time(from), time(from + samplesPerStrip)),
                     style: const pw.TextStyle(fontSize: 8)),
-                _strip(millivolts, from, samplesPerStrip, beats, premature, events, artifacts, gain, sampleRateHz),
+                _strip(millivolts, from, samplesPerStrip, beats, premature, irregular, events, artifacts, gain, sampleRateHz),
                 pw.SizedBox(height: 3 * mm),
               ],
             ),
@@ -276,7 +313,7 @@ class PdfReport {
                 ],
                 pw.Text(t.reportArtifactStrip(artifactLabel(artifact, sampleRateHz), time(from), time(from + samplesPerStrip)),
                     style: const pw.TextStyle(fontSize: 8)),
-                _strip(millivolts, from, samplesPerStrip, beats, premature, events, artifacts, gain, sampleRateHz),
+                _strip(millivolts, from, samplesPerStrip, beats, premature, irregular, events, artifacts, gain, sampleRateHz),
                 pw.SizedBox(height: 3 * mm),
               ],
             ),
@@ -299,8 +336,8 @@ class PdfReport {
   // one strip of EKG paper with the signal
   // PDF coordinates start at the BOTTOM left corner, y goes up (on the screen it goes down)
   static pw.Widget _strip(
-      Float32List mv, int from, int count, List<int> beats, List<int> premature, List<int> events,
-      List<Artifact> artifacts, int gain,
+      Float32List mv, int from, int count, List<int> beats, List<int> premature, List<(int, int)> irregular,
+      List<int> events, List<Artifact> artifacts, int gain,
       int sampleRateHz) {
     double mm = PdfPageFormat.mm;
     double width = stripSeconds * paperSpeedMmPerS * mm;
@@ -313,8 +350,27 @@ class PdfReport {
           ..setFillColor(_paper)
           ..drawRect(0, 0, width, height)
           ..fillPath();
-        // disturbed parts: light orange under the grid, an orange flag where they start
         double xStep = width / count;
+        // irregular rhythm: light green under the grid, a green flag where it starts
+        for (var (start, end) in irregular) {
+          if (end <= from || start >= from + count) continue;
+          double x0 = max(0, start - from) * xStep;
+          double x1 = min(count, end - from) * xStep;
+          canvas
+            ..setFillColor(_irregularBand)
+            ..drawRect(x0, 0, x1 - x0, height)
+            ..fillPath();
+          if (start >= from) {
+            canvas
+              ..setFillColor(_irregularColor)
+              ..moveTo(x0, height)
+              ..lineTo(x0 + 2.5 * mm, height - 1.2 * mm)
+              ..lineTo(x0, height - 2.4 * mm)
+              ..closePath()
+              ..fillPath();
+          }
+        }
+        // disturbed parts: light orange under the grid, an orange flag where they start
         for (Artifact a in artifacts) {
           if (a.end <= from || a.start >= from + count) continue;
           double x0 = max(0, a.start - from) * xStep;
@@ -398,9 +454,9 @@ class PdfReport {
   }
 
   // the median beat like MedianBeatChart in the app: square 40 ms boxes, the amplitude fitted
-  // to the height (no mm/mV scale, only the shape and the QRS borders matter here)
-  static pw.Widget _medianBeat(QrsSummary qrs, int sampleRateHz, double width, double height) {
-    List<double> beat = qrs.medianBeat!;
+  // to the height (no mm/mV scale, only the shape, the QRS borders and the T end matter here)
+  static pw.Widget _medianBeat(List<double> beat, (int, int)? q, int? tEnd, int sampleRateHz,
+      double width, double height) {
     return pw.CustomPaint(
       size: PdfPoint(width, height),
       painter: (PdfGraphics canvas, PdfPoint size) {
@@ -409,7 +465,6 @@ class PdfReport {
           ..drawRect(0, 0, width, height)
           ..fillPath();
         double xStep = width / (beat.length - 1);
-        (int, int)? q = qrs.qrs;
         if (q != null) {
           canvas
             ..setFillColor(_qrsBand)
@@ -419,6 +474,12 @@ class PdfReport {
         double box = 0.040 * sampleRateHz * xStep;
         _grid(canvas, width, height, box, _smallGrid, 0.2);
         _grid(canvas, width, height, 5 * box, _bigGrid, 0.5);
+        // a frame: the grid starts at a corner, without it the other edges end in the middle of a box
+        canvas
+          ..setStrokeColor(_bigGrid)
+          ..setLineWidth(0.5)
+          ..drawRect(0, 0, width, height)
+          ..strokePath();
         if (q != null) {
           canvas
             ..setStrokeColor(_qrsColor)
@@ -426,6 +487,13 @@ class PdfReport {
             ..drawLine(q.$1 * xStep, 0, q.$1 * xStep, height)
             ..drawLine(q.$2 * xStep, 0, q.$2 * xStep, height)
             ..strokePath();
+          // the T end: a dashed line (the QT value is in the text above)
+          if (tEnd != null) {
+            for (double y = 0; y < height; y += 2 * PdfPageFormat.mm) {
+              canvas.drawLine(tEnd * xStep, y, tEnd * xStep, min(y + PdfPageFormat.mm, height));
+            }
+            canvas.strokePath();
+          }
         }
         double low = beat.reduce(min), high = beat.reduce(max);
         double perMv = 0.8 * height / max(high - low, 0.05);

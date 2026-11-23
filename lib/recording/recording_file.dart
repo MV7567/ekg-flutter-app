@@ -2,6 +2,7 @@ import 'dart:convert';                              // utf8
 import 'dart:io';                                   // File, Directory, RandomAccessFile
 import 'package:flutter/foundation.dart';           // debugPrint, Float32List, Int32List
 import 'package:path_provider/path_provider.dart';  // the app's own folder
+import '../filters/zero_phase_filter.dart';     // the QT signal
 import '../ekg_config.dart';                        // sampleRateHz, millivoltsPerLsb
 import '../filters/biquad_filter.dart';             // EkgDisplayFilter
 import '../filters/spike_remover.dart';             // the same spike removing as live
@@ -138,10 +139,13 @@ class RecordingInfo {
       return RecordingData(filterMillivolts(unfiltered), Int32List(0), Int32List.fromList(parseEvents(lines)),
           const [], peakToPeak);
     }
+    // the zero phase copy for the QT (before filterMillivolts, it filters the list in place)
+    Float32List forMeasurement = Float32List.fromList(ZeroPhaseFilter.apply(unfiltered, sampleRateHz.toDouble()));
     Float32List millivolts = filterMillivolts(unfiltered);
     List<int> beats = HeartRateDetector.findBeats(millivolts, sampleRateHz);
     List<Artifact> artifacts = ArtifactDetector.find(millivolts, beats, sampleRateHz);
-    return RecordingData(millivolts, Int32List.fromList(beats), Int32List.fromList(parseEvents(lines)), artifacts);
+    return RecordingData(millivolts, Int32List.fromList(beats), Int32List.fromList(parseEvents(lines)), artifacts,
+        null, parseGaps(lines), forMeasurement);
   }
 
   // the test signal is a square with 2 levels: the upper and the lower one are the values at 90 % and
@@ -228,6 +232,23 @@ class RecordingInfo {
     return DateTime.tryParse('${m[1]}T${m[2]}:${m[3]}:${m[4]}');
   }
 
+  // the lost BLE packets: (the first missing sample, the next saved sample) for every jump
+  // in the sample numbers; parseMillivolts fills them with a flat line, the rhythm check must
+  // know they are not real (no beat there is not a pause)
+  static List<(int, int)> parseGaps(List<String> lines) {
+    List<(int, int)> gaps = [];
+    int? last;
+    for (String line in lines) {
+      int comma = line.indexOf(',');
+      if (comma <= 0) continue;
+      int? sample = int.tryParse(line.substring(0, comma));
+      if (sample == null) continue;                 // the column names
+      if (last != null && sample > last + 1) gaps.add((last + 1, sample));
+      if (last == null || sample > last) last = sample;
+    }
+    return gaps;
+  }
+
   // "# event: 5712" lines -> [5712, ...], the samples where the event button was tapped
   static List<int> parseEvents(List<String> lines) {
     List<int> events = [];
@@ -280,7 +301,9 @@ class RecordingInfo {
 // a loaded recording for the view screen
 // a plain class with typed lists, so compute() can send it back from the background isolate
 class RecordingData {
-  RecordingData(this.millivolts, this.beats, [Int32List? events, this.artifacts = const [], this.testPeakToPeakMv])
+  RecordingData(this.millivolts, this.beats,
+      [Int32List? events, this.artifacts = const [], this.testPeakToPeakMv, this.gaps = const [],
+      this.forMeasurement])
       : events = events ?? Int32List(0);
 
   final Float32List millivolts;   // filtered samples, index = sample number
@@ -288,4 +311,6 @@ class RecordingData {
   final Int32List events;         // sample numbers of the marked events, in order
   final List<Artifact> artifacts; // disturbed parts found automatically, in order
   final double? testPeakToPeakMv; // only for a test signal recording: its measured amplitude
+  final List<(int, int)> gaps;    // lost BLE packets: (first missing sample, next saved sample)
+  final Float32List? forMeasurement;   // the zero phase filtered samples, for the QT (ZeroPhaseFilter)
 }

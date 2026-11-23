@@ -85,7 +85,7 @@ void main() {
     expect(QrsWidth.regularBeats(beats, disturbed: (s) => s == beats[3]), isNot(contains(beats[3])));
   });
 
-  test('summary of a recording: the median beat, the typical width, the wide premature beats', () {
+  test('summary of a recording: the median beat and the typical width', () {
     // 12 normal beats of 90 ms every 200 samples, beat 8 comes early and is wide (150 ms)
     List<double> x = [];
     List<int> beats = [];
@@ -98,9 +98,8 @@ void main() {
     expect(s.typicalMs(fs), closeTo(90, 8));
     expect(s.medianBeat, isNotNull);
     expect(s.beatCount, greaterThanOrEqualTo(QrsWidth.minBeats));
-    expect(s.widePremature, {beats[8]});
 
-    // too few beats: no median beat, nothing wide
+    // too few beats: no median beat
     QrsSummary none = QrsSummary.analyze(x, beats.take(3).toList(), fs);
     expect(none.medianBeat, isNull);
     expect(none.typicalMs(fs), isNull);

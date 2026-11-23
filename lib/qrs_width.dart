@@ -76,11 +76,12 @@ class QrsWidth {
   // the median beat: for every sample around R the median of all the given beats,
   // returns (the samples, the position of R in them), null = fewer than minBeats usable beats
   static const int minBeats = 5;
-  static (List<double>, int)? medianBeat(List<double> x, List<int> beats, int sampleRateHz) {
-    // a bit more than the measure() limits, it needs the flat part behind them
-    // (40 ms: room for the longest flat part that is checked)
-    int before = ((maxBeforeRMs + 40) / 1000 * sampleRateHz).round() + 2;
-    int after = ((maxAfterRMs + 40) / 1000 * sampleRateHz).round() + 2;
+  // beforeMs / afterMs: a longer window, e.g. with the P and T waves; the default is a bit more
+  // than the measure() limits, it needs the flat part behind them (40 ms: the longest flat part checked)
+  static (List<double>, int)? medianBeat(List<double> x, List<int> beats, int sampleRateHz,
+      {double beforeMs = maxBeforeRMs + 40, double afterMs = maxAfterRMs + 40}) {
+    int before = (beforeMs / 1000 * sampleRateHz).round() + 2;
+    int after = (afterMs / 1000 * sampleRateHz).round() + 2;
     List<int> usable = [for (int r in beats) if (r - before >= 0 && r + after < x.length) r];
     if (usable.length < minBeats) return null;
     List<double> median = List.filled(before + after + 1, 0);
@@ -127,27 +128,22 @@ class QrsWidth {
 
 // everything about the QRS of one recording, for the statistics card and the PDF report
 class QrsSummary {
-  QrsSummary._(this.medianBeat, this.r, this.qrs, this.beatCount, this.widePremature);
+  QrsSummary._(this.medianBeat, this.r, this.qrs, this.beatCount);
 
   final List<double>? medianBeat;   // the median beat (mV), null = fewer than 5 regular beats
   final int r;                      // the position of R in medianBeat
   final (int, int)? qrs;            // start and end of the QRS in medianBeat, null = not measured
   final int beatCount;              // how many beats are in the median beat
-  final Set<int> widePremature;     // the premature beats (sample numbers) with a wide QRS
 
   double? typicalMs(int sampleRateHz) => qrs == null ? null : (qrs!.$2 - qrs!.$1) * 1000 / sampleRateHz;
 
-  // x: the filtered recording, premature: from RhythmAnalysis (left out of the median beat,
-  // each of them measured on its own: wide = probably from the ventricles)
+  // x: the filtered recording, premature: the premature beats by timing (left out of the median
+  // beat; which of them are ventricular is decided in RhythmAnalysis)
   static QrsSummary analyze(List<double> x, List<int> beats, int sampleRateHz,
       {List<int> premature = const [], bool Function(int sample) disturbed = QrsWidth._never}) {
     List<int> regular = QrsWidth.regularBeats(beats, skip: premature.toSet(), disturbed: disturbed);
     (List<double>, int)? median = QrsWidth.medianBeat(x, regular, sampleRateHz);
     (int, int)? qrs = median == null ? null : QrsWidth.measure(median.$1, median.$2, sampleRateHz);
-    Set<int> wide = {
-      for (int b in premature)
-        if ((QrsWidth.widthMs(x, b, sampleRateHz) ?? 0) >= QrsWidth.wideMs) b,
-    };
-    return QrsSummary._(median?.$1, median?.$2 ?? 0, qrs, median == null ? 0 : regular.length, wide);
+    return QrsSummary._(median?.$1, median?.$2 ?? 0, qrs, median == null ? 0 : regular.length);
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -10,7 +11,7 @@ import 'package:ecg_ble_app/heart_rate_detector.dart';
 import 'package:ecg_ble_app/l10n/app_localizations.dart';
 import 'package:ecg_ble_app/recording/pdf_report.dart';
 import 'package:ecg_ble_app/screens/recording_actions.dart';
-import 'package:ecg_ble_app/qrs_width.dart';
+import 'package:ecg_ble_app/af_detector.dart';
 import 'package:ecg_ble_app/rhythm_analysis.dart';
 import 'package:ecg_ble_app/rr_stats.dart';
 
@@ -73,6 +74,14 @@ void main() {
       bigeminy.add(bigeminy.last + rr);
     }
     expect(RhythmAnalysis.findPremature(bigeminy, fs).length, 25);
+    // random intervals 0.5-1.1 s from 10 s on: an irregular rhythm episode
+    Random random = Random(4);
+    List<int> irregularBeats = [10 * fs];
+    for (int k = 0; k < 60; k++) {
+      irregularBeats.add(irregularBeats.last + 125 + random.nextInt(150));
+    }
+    AfDetector irregular = AfDetector.analyze(irregularBeats, fs);
+    expect(irregular.suspected, isTrue);
     Uint8List full = await PdfReport.build(
       t: t, regular: regular, bold: bold,
       start: DateTime(2026, 11, 12, 16, 25), deviceName: 'ESP32_EKG', note: 'spoczynek, zażółć gęślą jaźń',
@@ -81,10 +90,19 @@ void main() {
       // more premature beats than fit in the info line, some on the strips
       // (bigeminy: 10 normal intervals of 200 samples, then 25 x early 130 + pause 270 = 25 premature)
       rhythm: RhythmAnalysis.analyze(bigeminy, fs, 52),
-      // the median beat of the test EKG, a few of the premature beats marked as wide
-      qrs: QrsSummary.analyze(mv, beats, fs, premature: bigeminy.take(15).toList()),
+      // an irregular part from 10 s to the end: a band on the strips and the info line
+      af: irregular,
     );
     expect(String.fromCharCodes(full.sublist(0, 5)), '%PDF-');
+
+    // with the signal: the median beat, the QRS width, the pauses line
+    Uint8List withShape = await PdfReport.build(
+      t: t, regular: regular, bold: bold,
+      start: null, deviceName: '', note: '',
+      millivolts: mv, beats: beats, stats: RrStats.fromBeats(beats, fs), sampleRateHz: fs,
+      rhythm: RhythmAnalysis.analyze(beats, fs, 72, signal: mv),
+    );
+    expect(String.fromCharCodes(withShape.sublist(0, 5)), '%PDF-');
 
     Uint8List short = await PdfReport.build(
       t: t, regular: regular, bold: bold,

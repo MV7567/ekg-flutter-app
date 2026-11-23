@@ -130,6 +130,10 @@ void main() {
         '# event: broken', '# note: event'];
     expect(RecordingInfo.parseEvents(lines), [1, 5712]);
     expect(RecordingInfo.parseEvents(header), isEmpty);   // a recording without events
+    // the lost packets: the sample numbers jump (the event line in between does not matter)
+    expect(RecordingInfo.parseGaps(lines), isEmpty);
+    expect(RecordingInfo.parseGaps([...header, '0,0.000,1,0.0061', '1,0.004,1,0.0061', '# event: 1',
+        '10,0.040,1,0.0061', '11,0.044,1,0.0061', '30,0.120,1,0.0061']), [(2, 10), (12, 30)]);
   });
 
   test('a real file with events: the samples are not changed, the events are found', () async {
@@ -146,6 +150,8 @@ void main() {
     RecordingData data = RecordingInfo.loadForView(file.path);
     expect(data.millivolts.length, 2500);
     expect(data.events, [700, 1800]);
+    expect(data.forMeasurement?.length, 2500);   // the zero phase copy for the QT
+    expect(data.gaps, isEmpty);
     expect((await RecordingInfo.load(file)).duration, const Duration(seconds: 10));
   });
 

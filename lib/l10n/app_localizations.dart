@@ -1175,7 +1175,7 @@ abstract class AppLocalizations {
   /// No description provided for @rhythmHint.
   ///
   /// In en, this message translates to:
-  /// **'A simple check from the timing of the beats only, not a diagnosis: it finds about half of the premature beats, and a slow heart rate at rest can be normal in fit people. The QRS width from one lead can be shorter than in a hospital 12-lead ECG. Show an unusual result to a doctor.'**
+  /// **'An automatic check from one lead: it finds about 2 of 3 premature beats, the QRS width and the QT can differ from a hospital 12-lead ECG, and a slow heart rate at rest can be normal in fit people. Show an unusual result to a doctor.'**
   String get rhythmHint;
 
   /// No description provided for @viewPremature.
@@ -1211,7 +1211,7 @@ abstract class AppLocalizations {
   /// No description provided for @rhythmPrematureWide.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =0{none of them with a wide QRS (probably from the atria)} =1{1 of them with a wide QRS (probably from the ventricles)} other{{count} of them with a wide QRS (probably from the ventricles)}}'**
+  /// **'{count, plural, =0{none of them with another QRS shape or a wide QRS (probably from the atria)} =1{1 of them with another QRS shape or a wide QRS (probably from the ventricles)} other{{count} of them with another QRS shape or a wide QRS (probably from the ventricles)}}'**
   String rhythmPrematureWide(int count);
 
   /// No description provided for @qrsMedianBeat.
@@ -1220,11 +1220,101 @@ abstract class AppLocalizations {
   /// **'The median beat of {count} regular beats, the QRS is marked'**
   String qrsMedianBeat(int count);
 
-  /// Chip of a premature beat with a wide QRS
+  /// Chip of a premature beat that is probably ventricular
   ///
   /// In en, this message translates to:
-  /// **'{time} wide'**
+  /// **'{time} ventricular'**
   String viewPrematureWide(String time);
+
+  /// No description provided for @afSuspected.
+  ///
+  /// In en, this message translates to:
+  /// **'Irregular rhythm for {seconds} s: possible atrial fibrillation or very frequent extra beats'**
+  String afSuspected(int seconds);
+
+  /// No description provided for @afNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No irregular rhythm typical of atrial fibrillation (30 s or longer)'**
+  String get afNone;
+
+  /// No description provided for @viewIrregular.
+  ///
+  /// In en, this message translates to:
+  /// **'Irregular rhythm:'**
+  String get viewIrregular;
+
+  /// No description provided for @rhythmRuns.
+  ///
+  /// In en, this message translates to:
+  /// **'Ventricular beats in a row: {pairs} pairs, {runs} runs of 3 or more'**
+  String rhythmRuns(int pairs, int runs);
+
+  /// No description provided for @rhythmNoPauses.
+  ///
+  /// In en, this message translates to:
+  /// **'No pauses of 2 s or longer'**
+  String get rhythmNoPauses;
+
+  /// No description provided for @rhythmPauses.
+  ///
+  /// In en, this message translates to:
+  /// **'Pauses of 2 s or longer: {count}, the longest {seconds} s'**
+  String rhythmPauses(int count, double seconds);
+
+  /// No description provided for @viewPauses.
+  ///
+  /// In en, this message translates to:
+  /// **'Pauses:'**
+  String get viewPauses;
+
+  /// Chip of ventricular beats in a row
+  ///
+  /// In en, this message translates to:
+  /// **'{time} {count} in a row'**
+  String viewRun(String time, int count);
+
+  /// No description provided for @viewRuns.
+  ///
+  /// In en, this message translates to:
+  /// **'Ventricular in a row:'**
+  String get viewRuns;
+
+  /// No description provided for @qtValues.
+  ///
+  /// In en, this message translates to:
+  /// **'QT {qt} ms, QTc {bazett} ms (Bazett) / {fridericia} ms (Fridericia)'**
+  String qtValues(int qt, int bazett, int fridericia);
+
+  /// No description provided for @qtNormal.
+  ///
+  /// In en, this message translates to:
+  /// **'QTc in the normal range (350–460 ms)'**
+  String get qtNormal;
+
+  /// No description provided for @qtLong.
+  ///
+  /// In en, this message translates to:
+  /// **'Long QTc (above 460 ms)'**
+  String get qtLong;
+
+  /// No description provided for @qtShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Short QTc (below 350 ms)'**
+  String get qtShort;
+
+  /// No description provided for @qtNotMeasured.
+  ///
+  /// In en, this message translates to:
+  /// **'QT: not measured, the T wave is too flat in this lead (another electrode placement may help)'**
+  String get qtNotMeasured;
+
+  /// No description provided for @rhythmWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'This is not a medical diagnosis.'**
+  String get rhythmWarning;
 }
 
 class _AppLocalizationsDelegate

@@ -24,6 +24,7 @@ class FullscreenChartScreen extends StatefulWidget {
     this.eventMarkers,
     this.artifactMarkers,
     this.prematureMarkers,
+    this.irregularMarkers,
   });
 
   final EkgBuffer buffer;
@@ -43,6 +44,8 @@ class FullscreenChartScreen extends StatefulWidget {
   final ValueListenable<List<Artifact>>? artifactMarkers;
   // only recordings: the premature beats (see EkgChart)
   final ValueListenable<List<int>>? prematureMarkers;
+  // only recordings: the irregular rhythm episodes (see EkgChart)
+  final ValueListenable<List<(int, int)>>? irregularMarkers;
 
   // opens the screen, returns the zoom chosen there, so the screen below can take it over
   static Future<double?> open(
@@ -57,6 +60,7 @@ class FullscreenChartScreen extends StatefulWidget {
     ValueListenable<List<int>>? eventMarkers,
     ValueListenable<List<Artifact>>? artifactMarkers,
     ValueListenable<List<int>>? prematureMarkers,
+    ValueListenable<List<(int, int)>>? irregularMarkers,
   }) {
     return Navigator.of(context).push<double>(MaterialPageRoute(
       builder: (context) => FullscreenChartScreen(
@@ -70,6 +74,7 @@ class FullscreenChartScreen extends StatefulWidget {
         eventMarkers: eventMarkers,
         artifactMarkers: artifactMarkers,
         prematureMarkers: prematureMarkers,
+        irregularMarkers: irregularMarkers,
       ),
     ));
   }
@@ -134,6 +139,7 @@ class _FullscreenChartScreenState extends State<FullscreenChartScreen> {
                       eventMarkers: widget.eventMarkers,
                       artifactMarkers: widget.artifactMarkers,
                       prematureMarkers: widget.prematureMarkers,
+                      irregularMarkers: widget.irregularMarkers,
                     ),
                   ),
                 ),

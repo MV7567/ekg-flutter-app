@@ -6,7 +6,7 @@ import '../ekg_buffer.dart';
 import '../ekg_config.dart';
 import '../heart_rate_detector.dart';        // average bpm, bpm in the window
 import '../recording/recording_file.dart';
-import '../qrs_width.dart';                  // QRS width, the median beat
+import '../af_detector.dart';                // irregular rhythm (atrial fibrillation)
 import '../rhythm_analysis.dart';            // slow / fast heart rate, premature beats
 import '../rr_stats.dart';                   // min / max bpm, HRV, tachogram
 import '../artifact_detector.dart';          // Artifact
@@ -44,7 +44,7 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
   double? _testPeakToPeak;           // a test signal recording: its measured amplitude, otherwise null
   RrStats? _stats;                   // min / max bpm, HRV, tachogram, null = not enough beats
   RhythmAnalysis? _rhythm;           // the rhythm check, null = not enough beats
-  QrsSummary? _qrs;                  // the QRS width and the median beat, null = not checked
+  AfDetector? _af;                   // the irregular rhythm episodes, null = not checked
   // the note, can be changed here, then the list has to read the files again when going back
   late String _note = widget.recording.note;
   bool _changed = false;
@@ -60,6 +60,8 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
   final ValueNotifier<List<Artifact>> _windowArtifacts = ValueNotifier(const []);
   // the premature beats inside the window (positions in it), the whole list is in _rhythm
   final ValueNotifier<List<int>> _windowPremature = ValueNotifier(const []);
+  // the irregular rhythm episodes inside the window (positions in it, can start before / end after it)
+  final ValueNotifier<List<(int, int)>> _windowIrregular = ValueNotifier(const []);
   // at most this many premature beat chips under the chart, then "+12 more"
   static const int _maxPrematureChips = 20;
 
@@ -91,15 +93,18 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
         RrStats? stats = _stats;
         _rhythm = stats == null || data.testPeakToPeakMv != null
             ? null
+            // with the signal: the beat shape and the QRS (the median beat, a few ms),
+            // with the lost packets: a pause over them is not real
             : RhythmAnalysis.analyze(data.beats, sampleRateHz, stats.averageBpm,
-                disturbed: (sample) => data.artifacts.any((a) => a.contains(sample)));
-        // the median beat: a few hundred beats x ~100 samples, a few ms
-        RhythmAnalysis? rhythm = _rhythm;
-        _qrs = rhythm == null
+                disturbed: (sample) => data.artifacts.any((a) => a.contains(sample)),
+                signal: data.millivolts, gaps: data.gaps, measureSignal: data.forMeasurement);
+        // the irregular rhythm; inside its episodes the premature beats are not shown
+        // (in atrial fibrillation every beat is irregular, "premature" means nothing there)
+        _af = _rhythm == null
             ? null
-            : QrsSummary.analyze(data.millivolts, data.beats, sampleRateHz,
-                premature: rhythm.prematureBeats,
+            : AfDetector.analyze(data.beats, sampleRateHz,
                 disturbed: (sample) => data.artifacts.any((a) => a.contains(sample)));
+        if (_af?.suspected ?? false) _rhythm = _rhythm!.without(_af!.contains);
       });
       _showWindow(0);
     } catch (e) {
@@ -127,6 +132,9 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
       for (Artifact a in _artifacts)
         if (a.end > start && a.start < end) Artifact(a.start - start, a.end - start),
     ];
+    _windowIrregular.value = [
+      for (var (s, e) in _af?.episodes ?? const <(int, int)>[]) if (e > start && s < end) (s - start, e - start),
+    ];
     _windowPremature.value = [
       for (int beat in _rhythm?.prematureBeats ?? const <int>[]) if (beat >= start && beat < end) beat - start,
     ];
@@ -139,6 +147,7 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
     _windowEvents.dispose();
     _windowArtifacts.dispose();
     _windowPremature.dispose();
+    _windowIrregular.dispose();
     _window.dispose();    // because EkgBuffer is ChangeNotifier
     super.dispose();
   }
@@ -197,7 +206,7 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
     setState(() => _makingReport = true);
     await shareReport(context, widget.recording,
         note: _note, millivolts: samples, beats: _beats, events: _events, artifacts: _artifacts, stats: _stats,
-        rhythm: _rhythm, qrs: _qrs,
+        rhythm: _rhythm, af: _af,
         testPeakToPeakMv: _testPeakToPeak);
     if (mounted) setState(() => _makingReport = false);
   }
@@ -258,6 +267,7 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
                         eventMarkers: _windowEvents, // blue lines at the marked events
                         artifactMarkers: _windowArtifacts,   // orange bands at the disturbances
                         prematureMarkers: _windowPremature,  // purple triangles under the premature beats
+                        irregularMarkers: _windowIrregular,  // green bands at the irregular rhythm
                       ),
                     ),
                     Positioned(top: 0, right: 0, child: FullscreenButton(onPressed: _openFullscreen)),
@@ -324,6 +334,23 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
                   ),
               ],
             ),
+          // the irregular rhythm episodes: a tap shows the start of it
+          if (_af?.suspected ?? false)
+            Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              children: [
+                Text(AppLocalizations.of(context).viewIrregular),
+                for (var (start, end) in _af!.episodes)
+                  ActionChip(
+                    avatar: const Icon(Icons.timeline, color: EkgChart.irregularColor, size: 18),
+                    label: Text('${RecordingsScreen.formatDuration(_sampleTime(start))}–'
+                        '${RecordingsScreen.formatDuration(_sampleTime(end))}'),
+                    onPressed: () => _showWindow(start),
+                  ),
+              ],
+            ),
           // the premature beats: a tap shows the beat in the middle of the chart
           if (_rhythm?.prematureBeats.isNotEmpty ?? false)
             Wrap(
@@ -335,14 +362,48 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
                 for (int beat in _rhythm!.prematureBeats.take(_maxPrematureChips))
                   ActionChip(
                     avatar: const Icon(Icons.change_history, color: EkgChart.prematureColor, size: 18),
-                    // "0:14 wide": a wide QRS, probably from the ventricles
-                    label: Text(_qrs?.widePremature.contains(beat) ?? false
+                    // "0:14 ventricular": another QRS shape or a wide QRS
+                    label: Text(_rhythm!.ventricular.contains(beat)
                         ? AppLocalizations.of(context).viewPrematureWide(RecordingsScreen.formatDuration(_sampleTime(beat)))
                         : RecordingsScreen.formatDuration(_sampleTime(beat))),
                     onPressed: () => _showWindow(beat - _window.capacity ~/ 2),
                   ),
                 if (_rhythm!.prematureBeats.length > _maxPrematureChips)
                   Text(AppLocalizations.of(context).viewMoreChips(_rhythm!.prematureBeats.length - _maxPrematureChips)),
+              ],
+            ),
+          // ventricular beats in a row (pairs, runs): a tap shows the first one
+          if (_rhythm?.runs.isNotEmpty ?? false)
+            Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              children: [
+                Text(AppLocalizations.of(context).viewRuns),
+                for (List<int> run in _rhythm!.runs.take(_maxPrematureChips))
+                  ActionChip(
+                    avatar: const Icon(Icons.change_history, color: EkgChart.prematureColor, size: 18),
+                    label: Text(AppLocalizations.of(context)
+                        .viewRun(RecordingsScreen.formatDuration(_sampleTime(run.first)), run.length)),
+                    onPressed: () => _showWindow(run.first - _window.capacity ~/ 2),
+                  ),
+              ],
+            ),
+          // the pauses: a tap shows the pause in the middle of the chart
+          if (_rhythm?.pauses.isNotEmpty ?? false)
+            Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              children: [
+                Text(AppLocalizations.of(context).viewPauses),
+                for (var (from, to) in _rhythm!.pauses.take(_maxPrematureChips))
+                  ActionChip(
+                    avatar: const Icon(Icons.pause, size: 18),
+                    label: Text('${RecordingsScreen.formatDuration(_sampleTime(from))}–'
+                        '${RecordingsScreen.formatDuration(_sampleTime(to))}'),
+                    onPressed: () => _showWindow((from + to) ~/ 2 - _window.capacity ~/ 2),
+                  ),
               ],
             ),
           const SizedBox(height: 8),
@@ -363,7 +424,7 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
             )
           else
             RecordingStatsCard(stats: _stats, durationSeconds: samples.length / sampleRateHz,
-                rhythm: _rhythm, qrs: _qrs),
+                rhythm: _rhythm, af: _af),
         ],
       ),
       ),
@@ -383,6 +444,7 @@ class _RecordingViewScreenState extends State<RecordingViewScreen> {
       eventMarkers: _windowEvents,
       artifactMarkers: _windowArtifacts,
       prematureMarkers: _windowPremature,
+      irregularMarkers: _windowIrregular,
     );
     if (mv != null && mounted) setState(() => _mvPerBigSquare = mv);   // zoom chosen in full screen
   }
