@@ -185,7 +185,7 @@ abstract class AppLocalizations {
   /// No description provided for @appTitle.
   ///
   /// In en, this message translates to:
-  /// **'EKG'**
+  /// **'ECG'**
   String get appTitle;
 
   /// No description provided for @homeSubtitle.
@@ -197,7 +197,7 @@ abstract class AppLocalizations {
   /// No description provided for @homeConnect.
   ///
   /// In en, this message translates to:
-  /// **'Connect to EKG device'**
+  /// **'Connect to ECG device'**
   String get homeConnect;
 
   /// No description provided for @homeRecordings.
@@ -281,7 +281,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsChartMatchesPalette.
   ///
   /// In en, this message translates to:
-  /// **'EKG chart in palette colors'**
+  /// **'ECG chart in palette colors'**
   String get settingsChartMatchesPalette;
 
   /// No description provided for @settingsChartMatchesPaletteHint.
@@ -377,13 +377,13 @@ abstract class AppLocalizations {
   /// No description provided for @scannerTitle.
   ///
   /// In en, this message translates to:
-  /// **'Search for EKG Devices'**
+  /// **'Search for ECG Devices'**
   String get scannerTitle;
 
   /// No description provided for @scannerPermissionNeeded.
   ///
   /// In en, this message translates to:
-  /// **'The app needs the Bluetooth permission to find the EKG device'**
+  /// **'The app needs the Bluetooth permission to find the ECG device'**
   String get scannerPermissionNeeded;
 
   /// No description provided for @scannerOpenSettings.
@@ -407,7 +407,7 @@ abstract class AppLocalizations {
   /// No description provided for @scannerNothingFound.
   ///
   /// In en, this message translates to:
-  /// **'No EKG device found.\nCheck if the ESP32 is powered on and try again.'**
+  /// **'No ECG device found.\nCheck if the ESP32 is powered on and try again.'**
   String get scannerNothingFound;
 
   /// No description provided for @scannerHint.
@@ -449,13 +449,13 @@ abstract class AppLocalizations {
   /// No description provided for @deviceServiceNotFound.
   ///
   /// In en, this message translates to:
-  /// **'EKG service not found, is the right firmware uploaded?'**
+  /// **'ECG service not found, is the right firmware uploaded?'**
   String get deviceServiceNotFound;
 
   /// No description provided for @deviceServiceReadError.
   ///
   /// In en, this message translates to:
-  /// **'Could not read the EKG service, try to reconnect'**
+  /// **'Could not read the ECG service, try to reconnect'**
   String get deviceServiceReadError;
 
   /// No description provided for @deviceFileError.
@@ -527,7 +527,7 @@ abstract class AppLocalizations {
   /// No description provided for @deviceSearchingService.
   ///
   /// In en, this message translates to:
-  /// **'Searching for the EKG service...'**
+  /// **'Searching for the ECG service...'**
   String get deviceSearchingService;
 
   /// No description provided for @deviceLength.
@@ -731,7 +731,7 @@ abstract class AppLocalizations {
   /// No description provided for @reportTitle.
   ///
   /// In en, this message translates to:
-  /// **'EKG report'**
+  /// **'ECG report'**
   String get reportTitle;
 
   /// No description provided for @reportStart.
@@ -761,7 +761,7 @@ abstract class AppLocalizations {
   /// No description provided for @reportEkg.
   ///
   /// In en, this message translates to:
-  /// **'EKG ({speed} mm/s, {gain} mm/mV, filtered 0.5–40 Hz)'**
+  /// **'ECG ({speed} mm/s, {gain} mm/mV, filtered 0.5–40 Hz)'**
   String reportEkg(int speed, int gain);
 
   /// No description provided for @reportStripsRange.
@@ -857,7 +857,7 @@ abstract class AppLocalizations {
   /// E-mail subject when a recording is shared
   ///
   /// In en, this message translates to:
-  /// **'EKG recording {date}'**
+  /// **'ECG recording {date}'**
   String shareSubject(String date);
 
   /// No description provided for @shareError.
@@ -956,7 +956,7 @@ abstract class AppLocalizations {
   /// **'Auto'**
   String get chartZoomAuto;
 
-  /// Scale of the EKG paper, top left of the chart
+  /// Scale of the ECG paper, top left of the chart
   ///
   /// In en, this message translates to:
   /// **'1 square: {seconds} s × {millivolts} mV'**

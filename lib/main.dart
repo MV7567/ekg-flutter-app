@@ -30,7 +30,8 @@ class EkgApp extends StatelessWidget {
     return ListenableBuilder(
       listenable: AppSettings.instance,
       builder: (context, _) => MaterialApp(
-        title: 'EKG App',
+        // the app name in the recent apps list, in the phone language (EKG / ECG)
+        onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
         // Material 3 ignores primarySwatch, the colors come from the colorScheme
         // the palette chosen in Settings, the theme itself is made in app_palette.dart
         theme: buildAppTheme(AppSettings.instance.palette, Brightness.light,

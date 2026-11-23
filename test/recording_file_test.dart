@@ -73,6 +73,18 @@ void main() {
     expect(CsvRecorder.footerLines(note: '   '), isEmpty);                 // only spaces = no note
   });
 
+  test('footer: the packet arrival times, they change neither the duration, the note nor the bpm', () {
+    List<String> footer = CsvRecorder.footerLines(averageBpm: 78, note: 'rest',
+        firstPacket: (9, DateTime(2026, 11, 22, 22, 9, 12, 345)), lastPacket: (449999, DateTime(2026, 11, 22, 22, 39, 12, 400)));
+    expect(footer.take(2), ['# first packet: sample 9 at 2026-11-22T22:09:12.345',
+        '# last packet: sample 449999 at 2026-11-22T22:39:12.400']);
+    List<String> tail = ['449998,1799.992,10,0.0610', '449999,1799.996,12,0.0732', ...footer];
+    expect(RecordingInfo.durationFromLastLines(tail), const Duration(seconds: 1800));
+    expect(RecordingInfo.parseNote(tail), 'rest');
+    expect(RecordingInfo.parseAverageBpm(tail), 78);
+    expect(RecordingInfo.parseMillivolts(tail).length, 450000);
+  });
+
   test('note: one line, trimmed, at most 80 characters', () {
     expect(CsvRecorder.cleanNote('  po bieganiu \n zmęczony\r\n'), 'po bieganiu zmęczony');
     expect(CsvRecorder.cleanNote('x' * 200).length, CsvRecorder.maxNoteLength);

@@ -37,6 +37,15 @@ class CsvRecorder {
   // (the firmware marks those packets), the app then shows a calibration check instead of heart rate
   static const String testSignalTag = '# test signal: ADS1194 internal';
 
+  // the phone time when the first and the last saved packet arrived, in the footer:
+  // "# first packet: sample 9 at 2026-11-22T22:09:12.345678"
+  // with them the real sample rate of the device can be checked (samples / phone time),
+  // over a long recording the BLE delay of a few ms does not matter
+  static const String firstPacketTag = '# first packet:';
+  static const String lastPacketTag = '# last packet:';
+  (int, DateTime)? _firstPacket;   // (the last sample number in the packet, arrival time)
+  (int, DateTime)? _lastPacket;
+
   // the column names line: all 4 columns, or only the sample number and the raw value
   // ("raw only" in the advanced settings: about half the file size, time and mV can be
   //  calculated back from them, the app reads both kinds)
@@ -62,6 +71,8 @@ class CsvRecorder {
   // creates a new file with the header, returns false if no folder is writable
   Future<bool> open({required String deviceName, bool rawOnly = false}) async {
     _rawOnly = rawOnly;
+    _firstPacket = null;
+    _lastPacket = null;
     // readable timestamp for the file name, e.g. ekg_2026-10-21_14-30-05.csv
     // one "now" for the file name and the header, so they always show the same time
     DateTime start = DateTime.now();
@@ -112,6 +123,15 @@ class CsvRecorder {
     _sink?.writeln(_rawOnly ? rawCsvLine(sampleIndex, rawValue) : csvLine(sampleIndex, rawValue));
   }
 
+  // a whole packet was saved, its last sample is lastSampleIndex: remembers when it arrived
+  // (for the footer, see firstPacketTag), nothing is written to the file now
+  void packetSaved(int lastSampleIndex) {
+    if (_sink == null) return;
+    (int, DateTime) packet = (lastSampleIndex, DateTime.now());
+    _firstPacket ??= packet;
+    _lastPacket = packet;
+  }
+
   // marks an event at this sample (the newest one received when the button was tapped)
   void writeEvent(int sampleIndex) {
     _sink?.writeln('$eventTag $sampleIndex');
@@ -148,9 +168,12 @@ class CsvRecorder {
 
   // the footer lines, static so they can be tested without a file
   // nothing known -> no line (an old app or a too short recording)
-  static List<String> footerLines({int? averageBpm, String note = ''}) {
+  static List<String> footerLines({int? averageBpm, String note = '',
+      (int, DateTime)? firstPacket, (int, DateTime)? lastPacket}) {
     String cleaned = cleanNote(note);
     return [
+      if (firstPacket != null) '$firstPacketTag sample ${firstPacket.$1} at ${firstPacket.$2.toIso8601String()}',
+      if (lastPacket != null) '$lastPacketTag sample ${lastPacket.$1} at ${lastPacket.$2.toIso8601String()}',
       if (averageBpm != null) '$averageBpmTag $averageBpm',
       if (cleaned.isNotEmpty) '$noteTag $cleaned',
     ];
@@ -173,7 +196,8 @@ class CsvRecorder {
     if (sink == null) return true;   // nothing open, nothing could fail
     // take the value and then reset it
 
-    for (String line in footerLines(averageBpm: averageBpm, note: note)) {
+    for (String line in footerLines(averageBpm: averageBpm, note: note,
+        firstPacket: _firstPacket, lastPacket: _lastPacket)) {
       sink.writeln(line);
     }
 

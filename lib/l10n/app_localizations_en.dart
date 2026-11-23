@@ -57,13 +57,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get viewEvents => 'Events:';
 
   @override
-  String get appTitle => 'EKG';
+  String get appTitle => 'ECG';
 
   @override
   String get homeSubtitle => 'ESP32 + ADS1194 over Bluetooth';
 
   @override
-  String get homeConnect => 'Connect to EKG device';
+  String get homeConnect => 'Connect to ECG device';
 
   @override
   String get homeRecordings => 'Recordings';
@@ -105,7 +105,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsColors => 'Colors';
 
   @override
-  String get settingsChartMatchesPalette => 'EKG chart in palette colors';
+  String get settingsChartMatchesPalette => 'ECG chart in palette colors';
 
   @override
   String get settingsChartMatchesPaletteHint =>
@@ -157,11 +157,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get paletteOrange => 'Orange';
 
   @override
-  String get scannerTitle => 'Search for EKG Devices';
+  String get scannerTitle => 'Search for ECG Devices';
 
   @override
   String get scannerPermissionNeeded =>
-      'The app needs the Bluetooth permission to find the EKG device';
+      'The app needs the Bluetooth permission to find the ECG device';
 
   @override
   String get scannerOpenSettings => 'SETTINGS';
@@ -176,7 +176,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get scannerNothingFound =>
-      'No EKG device found.\nCheck if the ESP32 is powered on and try again.';
+      'No ECG device found.\nCheck if the ESP32 is powered on and try again.';
 
   @override
   String get scannerHint =>
@@ -200,11 +200,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get deviceServiceNotFound =>
-      'EKG service not found, is the right firmware uploaded?';
+      'ECG service not found, is the right firmware uploaded?';
 
   @override
   String get deviceServiceReadError =>
-      'Could not read the EKG service, try to reconnect';
+      'Could not read the ECG service, try to reconnect';
 
   @override
   String get deviceFileError => 'Could not create the data file';
@@ -243,7 +243,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deviceStateDisconnected => 'DISCONNECTED';
 
   @override
-  String get deviceSearchingService => 'Searching for the EKG service...';
+  String get deviceSearchingService => 'Searching for the ECG service...';
 
   @override
   String get deviceLength => 'Length:';
@@ -373,7 +373,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reportButton => 'PDF report';
 
   @override
-  String get reportTitle => 'EKG report';
+  String get reportTitle => 'ECG report';
 
   @override
   String get reportStart => 'Start';
@@ -389,7 +389,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String reportEkg(int speed, int gain) {
-    return 'EKG ($speed mm/s, $gain mm/mV, filtered 0.5–40 Hz)';
+    return 'ECG ($speed mm/s, $gain mm/mV, filtered 0.5–40 Hz)';
   }
 
   @override
@@ -451,7 +451,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String shareSubject(String date) {
-    return 'EKG recording $date';
+    return 'ECG recording $date';
   }
 
   @override

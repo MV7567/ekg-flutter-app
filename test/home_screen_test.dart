@@ -23,8 +23,8 @@ void main() {
     await tester.pumpWidget(app(const HomeScreen()));
     await tester.pumpAndSettle();   // translations are loaded asynchronously, wait for them
 
-    expect(find.text('EKG'), findsOneWidget);
-    expect(find.text('Connect to EKG device'), findsOneWidget);
+    expect(find.text('ECG'), findsOneWidget);
+    expect(find.text('Connect to ECG device'), findsOneWidget);
     expect(find.text('Recordings'), findsOneWidget);
     expect(find.text('How to measure'), findsOneWidget);
     expect(find.text('Settings'), findsOneWidget);

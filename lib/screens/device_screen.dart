@@ -556,6 +556,10 @@ class _DeviceScreenState extends State<DeviceScreen> {
       _testSignalMarked = true;
     }
 
+    // the arrival time of a whole saved packet, for the real sample rate (see CsvRecorder.packetSaved)
+    int packetLast = packet.firstSampleIndex + packet.rawValues.length - 1;
+    if (toFile && (_sampleLimit == null || packetLast < _sampleLimit!)) _recorder.packetSaved(packetLast);
+
     for (int i = 0; i < packet.rawValues.length; i++) {
       // timed recording: samples after the chosen length are not saved, the file is exactly 30 s etc.
       if (toFile && _sampleLimit != null && packet.firstSampleIndex + i >= _sampleLimit!) break;

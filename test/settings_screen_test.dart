@@ -51,10 +51,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(AppSettings.instance.chartMatchesPalette, isFalse);   // off by default
-    await tester.tap(find.text('EKG chart in palette colors'));
+    await tester.tap(find.text('ECG chart in palette colors'));
     await tester.pumpAndSettle();
     expect(AppSettings.instance.chartMatchesPalette, isTrue);
-    await tester.tap(find.text('EKG chart in palette colors'));
+    await tester.tap(find.text('ECG chart in palette colors'));
     await tester.pumpAndSettle();
     expect(AppSettings.instance.chartMatchesPalette, isFalse);
   });

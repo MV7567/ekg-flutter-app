@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- the name under the app icon, English (ECG); the Polish one is in values-pl -->
+    <string name="app_name">ECG</string>
+</resources>
