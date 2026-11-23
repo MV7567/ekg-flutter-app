@@ -211,5 +211,10 @@
   "qtLong": "Wydłużony QTc (powyżej 460 ms)",
   "qtShort": "Skrócony QTc (poniżej 350 ms)",
   "qtNotMeasured": "QT: nie zmierzono, załamek T jest zbyt płaski w tym odprowadzeniu (może pomóc inne ułożenie elektrod)",
-  "rhythmWarning": "To nie jest diagnoza medyczna."
+  "rhythmWarning": "To nie jest diagnoza medyczna.",
+  "recordingsSelect": "Zaznacz",
+  "recordingsSelected": "Zaznaczono: {count}",
+  "recordingsSelectAll": "Zaznacz wszystkie",
+  "recordingsSelectionEnd": "Zakończ zaznaczanie",
+  "recordingsShareSelected": "Udostępnij zaznaczone nagrania"
 }

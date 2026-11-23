@@ -254,5 +254,11 @@
   "qtLong": "Long QTc (above 460 ms)",
   "qtShort": "Short QTc (below 350 ms)",
   "qtNotMeasured": "QT: not measured, the T wave is too flat in this lead (another electrode placement may help)",
-  "rhythmWarning": "This is not a medical diagnosis."
+  "rhythmWarning": "This is not a medical diagnosis.",
+  "recordingsSelect": "Select",
+  "recordingsSelected": "Selected: {count}",
+  "@recordingsSelected": {"placeholders": {"count": {"type": "int"}}},
+  "recordingsSelectAll": "Select all",
+  "recordingsSelectionEnd": "End selecting",
+  "recordingsShareSelected": "Share the selected recordings"
 }

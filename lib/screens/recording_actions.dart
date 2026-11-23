@@ -29,6 +29,25 @@ String testSignalResult(AppLocalizations t, double measuredMv) {
 // so both screens do exactly the same
 
 // opens the system share window (Gmail, Drive, Bluetooth, ...) with the CSV file attached
+// several recordings at once (e.g. the results of a test series), one share window with all the files
+// no subject: with one subject Google Drive would name every file the same, without it the files
+// keep their own names (ekg_2026-11-23_21-30-05.csv), with .csv
+Future<void> shareRecordings(BuildContext context, List<RecordingInfo> recordings) async {
+  if (recordings.isEmpty) return;
+  if (recordings.length == 1) return shareRecording(context, recordings.first);
+  AppLocalizations t = AppLocalizations.of(context);
+  try {
+    await SharePlus.instance.share(ShareParams(
+      files: [for (RecordingInfo r in recordings) XFile(r.file.path, mimeType: 'text/csv')],
+    ));
+  } catch (e) {
+    debugPrint("Share error: $e");
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t.shareError('$e'))));
+    }
+  }
+}
+
 Future<void> shareRecording(BuildContext context, RecordingInfo recording) async {
   // texts taken now, while the screen surely exists (before any await)
   AppLocalizations t = AppLocalizations.of(context);

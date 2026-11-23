@@ -1315,6 +1315,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This is not a medical diagnosis.'**
   String get rhythmWarning;
+
+  /// No description provided for @recordingsSelect.
+  ///
+  /// In en, this message translates to:
+  /// **'Select'**
+  String get recordingsSelect;
+
+  /// No description provided for @recordingsSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected: {count}'**
+  String recordingsSelected(int count);
+
+  /// No description provided for @recordingsSelectAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Select all'**
+  String get recordingsSelectAll;
+
+  /// No description provided for @recordingsSelectionEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'End selecting'**
+  String get recordingsSelectionEnd;
+
+  /// No description provided for @recordingsShareSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Share the selected recordings'**
+  String get recordingsShareSelected;
 }
 
 class _AppLocalizationsDelegate

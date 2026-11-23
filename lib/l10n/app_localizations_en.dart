@@ -764,4 +764,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get rhythmWarning => 'This is not a medical diagnosis.';
+
+  @override
+  String get recordingsSelect => 'Select';
+
+  @override
+  String recordingsSelected(int count) {
+    return 'Selected: $count';
+  }
+
+  @override
+  String get recordingsSelectAll => 'Select all';
+
+  @override
+  String get recordingsSelectionEnd => 'End selecting';
+
+  @override
+  String get recordingsShareSelected => 'Share the selected recordings';
 }

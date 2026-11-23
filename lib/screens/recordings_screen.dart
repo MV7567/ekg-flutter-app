@@ -5,8 +5,13 @@ import 'recording_actions.dart';
 import 'recording_view_screen.dart';
 
 // list of the saved CSV recordings, newest first
+// a long press (or "Select" in the ⋮ menu) starts selecting: then a tap marks / unmarks a recording
+// and the top bar can share all the marked ones at once (e.g. the files of a test series)
 class RecordingsScreen extends StatefulWidget {
-  const RecordingsScreen({super.key});
+  const RecordingsScreen({super.key, this.load = RecordingInfo.listAll});
+
+  // where the list comes from: the folders on the phone, a fixed list in the tests
+  final Future<List<RecordingInfo>> Function() load;
 
   @override
   State<RecordingsScreen> createState() => _RecordingsScreenState();
@@ -40,18 +45,66 @@ class RecordingsScreen extends StatefulWidget {
 
 class _RecordingsScreenState extends State<RecordingsScreen> {
   late Future<List<RecordingInfo>> _recordings;
+  // the marked recordings (their file paths), empty = not selecting
+  final Set<String> _selected = {};
+  bool get _selecting => _selected.isNotEmpty;
 
   @override
   void initState() {
     super.initState();
-    _recordings = RecordingInfo.listAll();
+    _recordings = widget.load();
   }
 
   // reads the folders again, used by pull-to-refresh and after a delete (R4)
+  // the selection ends: the files may have changed
   Future<void> _refresh() async {
-    Future<List<RecordingInfo>> next = RecordingInfo.listAll();
-    setState(() => _recordings = next);
+    Future<List<RecordingInfo>> next = widget.load();
+    setState(() {
+      _recordings = next;
+      _selected.clear();
+    });
     await next;   // the refresh spinner stays until the list is read
+  }
+
+  // marks or unmarks one recording; unmarking the last one ends the selecting
+  void _toggle(RecordingInfo r) {
+    setState(() {
+      if (!_selected.remove(r.file.path)) _selected.add(r.file.path);
+    });
+  }
+
+  Future<void> _shareSelected() async {
+    List<RecordingInfo> all = await _recordings;
+    if (!mounted) return;
+    await shareRecordings(context, [for (RecordingInfo r in all) if (_selected.contains(r.file.path)) r]);
+  }
+
+  // the top bar: the title, or while selecting how many are marked and what to do with them
+  PreferredSizeWidget _appBar(AppLocalizations t) {
+    if (!_selecting) return AppBar(title: Text(t.homeRecordings));
+    return AppBar(
+      leading: IconButton(
+        icon: const Icon(Icons.close),
+        tooltip: t.recordingsSelectionEnd,
+        onPressed: () => setState(_selected.clear),
+      ),
+      title: Text(t.recordingsSelected(_selected.length)),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.select_all),
+          tooltip: t.recordingsSelectAll,
+          onPressed: () async {
+            List<RecordingInfo> all = await _recordings;
+            if (mounted) setState(() => _selected.addAll([for (RecordingInfo r in all) r.file.path]));
+          },
+        ),
+        IconButton(
+          icon: const Icon(Icons.share),
+          tooltip: t.recordingsShareSelected,
+          onPressed: _shareSelected,
+        ),
+      ],
+    );
   }
 
   // the view screen returns true when the recording was deleted there
@@ -75,8 +128,14 @@ class _RecordingsScreenState extends State<RecordingsScreen> {
   @override
   Widget build(BuildContext context) {
     AppLocalizations t = AppLocalizations.of(context);   // texts in the chosen language
-    return Scaffold(
-      appBar: AppBar(title: Text(t.homeRecordings)),
+    // while selecting, "back" only ends the selecting
+    return PopScope(
+      canPop: !_selecting,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) setState(_selected.clear);
+      },
+      child: Scaffold(
+      appBar: _appBar(t),
       body: FutureBuilder<List<RecordingInfo>>(     // list read in the background, listAll() returns Future because file reading is in progress, 
         future: _recordings,                        // in initState it saves this Future in _recordings, Future builder draws the screen depending on its state
         builder: (context, snapshot) {
@@ -113,23 +172,32 @@ class _RecordingsScreenState extends State<RecordingsScreen> {
                       // the first line: test signal mark and / or the note, only if there is one
                       String firstLine = [if (r.isTestSignal) '🧪 ${t.deviceAdsTest}', if (r.note.isNotEmpty) r.note]
                           .join('  ·  ');
+                      bool marked = _selected.contains(r.file.path);
                       return ListTile(
-                        leading: const Icon(Icons.monitor_heart),
+                        // while selecting a check box instead of the heart, a tap marks
+                        leading: _selecting
+                            ? Checkbox(value: marked, onChanged: (_) => _toggle(r))
+                            : const Icon(Icons.monitor_heart),
+                        selected: marked,
                         title: Text(RecordingsScreen.formatStart(r.start, t)),
                         // the note in its own line above the details, only if there is one
                         subtitle: Text('${firstLine.isEmpty ? '' : '$firstLine\n'}'
                             '${RecordingsScreen.formatDuration(r.duration)}  ·  '
                             '${RecordingsScreen.formatSize(r.sizeBytes)}$bpm$device'),
                         isThreeLine: firstLine.isNotEmpty,   // more room for the extra line
-                        onTap: () => _open(r),
-                        // ⋮ menu on the right
-                        trailing: PopupMenuButton<String>(  // each position has value (share/delete)
+                        onTap: () => _selecting ? _toggle(r) : _open(r),
+                        onLongPress: () => _toggle(r),
+                        // ⋮ menu on the right (not while selecting, the top bar has the actions then)
+                        trailing: _selecting ? null : PopupMenuButton<String>(  // each position has value (share/delete)
                           onSelected: (action) => switch (action) {   // decides what to do
                             'share' => shareRecording(context, r),
                             'note' => _editNote(r),
+                            'select' => _toggle(r),
                             _ => _delete(r),
                           },
                           itemBuilder: (context) => [
+                            PopupMenuItem(value: 'select', child: ListTile(
+                                leading: const Icon(Icons.check_box_outlined), title: Text(t.recordingsSelect))),
                             PopupMenuItem(value: 'note', child: ListTile(
                                 leading: const Icon(Icons.edit_note), title: Text(t.noteEdit))),
                             PopupMenuItem(value: 'share', child: ListTile(  // ListTile so there can be an icon next to text
@@ -143,6 +211,7 @@ class _RecordingsScreenState extends State<RecordingsScreen> {
                   ),
           );
         },
+      ),
       ),
     );
   }

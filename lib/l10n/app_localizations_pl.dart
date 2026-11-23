@@ -771,4 +771,21 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get rhythmWarning => 'To nie jest diagnoza medyczna.';
+
+  @override
+  String get recordingsSelect => 'Zaznacz';
+
+  @override
+  String recordingsSelected(int count) {
+    return 'Zaznaczono: $count';
+  }
+
+  @override
+  String get recordingsSelectAll => 'Zaznacz wszystkie';
+
+  @override
+  String get recordingsSelectionEnd => 'Zakończ zaznaczanie';
+
+  @override
+  String get recordingsShareSelected => 'Udostępnij zaznaczone nagrania';
 }
