@@ -539,7 +539,40 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get instrElectrodesIntro =>
-      'Three electrodes, the colors are the ones of the cable in this kit:';
+      'Three electrodes, the colors are the ones of the cable in this kit. Two of them measure the signal (− and +), the third one only reduces the interference.';
+
+  @override
+  String get instrVariant1 => 'Option 1 (recommended): on the body';
+
+  @override
+  String get instrMinus => 'Minus (−)';
+
+  @override
+  String get instrMinusWhere => 'below the right collarbone';
+
+  @override
+  String get instrPlus => 'Plus (+)';
+
+  @override
+  String get instrPlusWhere => 'below the left collarbone';
+
+  @override
+  String get instrReference => 'Reference';
+
+  @override
+  String get instrReferenceWhere => 'left side of the belly, below the heart';
+
+  @override
+  String get instrVariant2 =>
+      'Option 2, on the body: like option 1, but the yellow and the green electrode swapped. Similar quality.';
+
+  @override
+  String get instrVariant3 =>
+      'Option 3, wrists: red on the right wrist, yellow on the left one, green on an ankle. The arms must rest still.';
+
+  @override
+  String get instrRule =>
+      'Rule: red always at the top on the right, yellow always on the left, green in the remaining place.';
 
   @override
   String get instrCableRightArm => 'green lead, marked R';
@@ -549,25 +582,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get instrCableLeftLeg => 'yellow lead, marked L';
-
-  @override
-  String get instrRightArm => 'Right arm';
-
-  @override
-  String get instrRightArmWhere => 'right wrist or below the right collarbone';
-
-  @override
-  String get instrLeftArm => 'Left arm';
-
-  @override
-  String get instrLeftArmWhere => 'left wrist or below the left collarbone';
-
-  @override
-  String get instrLeftLeg => 'Left leg';
-
-  @override
-  String get instrLeftLegWhere =>
-      'left side of the belly, below the heart, or the left ankle';
 
   @override
   String get instrFrontView =>
@@ -605,7 +619,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get instrDuring4 =>
-      'Spikes pointing DOWN usually mean RA and LA are swapped.';
+      'Spikes pointing DOWN: swap the red and the yellow electrode.';
 
   @override
   String get instrLengthTitle => '4. How long to record';
@@ -652,7 +666,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get rhythmHint =>
-      'An automatic check from one lead: it finds about 2 of 3 premature beats, the QRS width and the QT can differ from a hospital 12-lead ECG, and a slow heart rate at rest can be normal in fit people. Show an unusual result to a doctor.';
+      'An automatic check from one lead: it finds about half of the premature beats, the QRS width and the QT can differ from a hospital 12-lead ECG, and a slow heart rate at rest can be normal in fit people. Show an unusual result to a doctor.';
 
   @override
   String get viewPremature => 'Premature beats:';
@@ -671,6 +685,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String qrsTypicalWide(int ms) {
     return 'Typical QRS width: $ms ms, a wide QRS (120 ms or more)';
   }
+
+  @override
+  String get qrsVariableShape =>
+      'QRS width: not measured, the beats change their shape (e.g. deep breathing or moving, another electrode placement may help)';
+
+  @override
+  String get qtVariableShape =>
+      'QT: not measured, the beats change their shape';
 
   @override
   String get qrsNotMeasured =>

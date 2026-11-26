@@ -116,6 +116,30 @@ void main() {
         [startsWith('QT: nie zmierzono')]);
   });
 
+  test('beats of changing shape: the QT is not measured, the card says why', () {
+    List<double> x = [];
+    List<int> beats = [];
+    for (int k = 0; k < 12; k++) {
+      beats.add(x.length + 81);
+      // the R wave smaller and an S wave after it deeper, changing from beat to beat
+      // (the QRS turns over with the breathing, like in lead III)
+      double rPart = 0.5 + 0.5 * cos(k.toDouble());
+      List<double> one = beatWith();
+      for (int i = 70; i <= 92; i++) {
+        one[i] *= rPart;
+      }
+      for (int i = 0; i <= 12; i++) {
+        one[93 + i] -= (1 - rPart) * (1 - (i - 6).abs() / 6);
+      }
+      x.addAll(one);
+    }
+    QtSummary s = QtSummary.analyze(x, x, beats, 1000, fs)!;
+    expect(s.variableShape, isTrue);
+    expect(s.qt, isNull);
+    AppLocalizations pl = lookupAppLocalizations(const Locale('pl'));
+    expect(RecordingStatsCard.qtLines(pl, s), ['QT: nie zmierzono, uderzenia mają zmienny kształt']);
+  });
+
   testWidgets('the median beat chart with the QT line, also when the label does not fit on the right', (tester) async {
     for (int tEnd in [165, 248]) {
       await tester.pumpWidget(MaterialApp(

@@ -40,6 +40,10 @@ class ArtifactDetector {
   static const double minSwingMillivolts = 0.1;   // never call less than this a disturbance
   // fast wiggling: the median step between samples, the same idea as SignalQualityMonitor
   static const double maxTypicalSlope = 0.03;
+  static const double wiggleOfR = 0.03;   // ... or 3 % of the usual R wave, if that is more
+  // a found "beat" that the heart can not make is the disturbance itself, its QRS does not hide it
+  static const double impossibleRrSeconds = 0.3;
+  static const double impossibleHeightOfR = 3;
   // pieces closer than this are one disturbance, and every disturbance gets this margin
   static const double joinSeconds = 0.5;
   static const double marginSeconds = 0.25;
@@ -55,20 +59,25 @@ class ArtifactDetector {
     List<double> heights = [for (int b in beats) if (b >= 0 && b < n) mv[b].abs()]..sort();
     double typicalR = heights.length >= 3 ? heights[heights.length ~/ 2] : _percentile(mv, 0.95);
     double swingLimit = max(minSwingMillivolts, swingOfR * typicalR);
+    double wiggleLimit = max(maxTypicalSlope, wiggleOfR * typicalR);
 
     // true = this sample belongs to a QRS, not checked for swings
     // only the believable beats: a "beat" much too early or much too high is usually the
     // disturbance itself (found by the detector), its QRS must not hide it
-    List<int> rr = [for (int i = 1; i < beats.length; i++) beats[i] - beats[i - 1]]..sort();
-    int typicalRr = rr.isEmpty ? 0 : rr[rr.length ~/ 2];
     List<bool> qrs = List.filled(n, false);
     int before = (qrsBeforeSeconds * sampleRateHz).round();
     int after = (qrsAfterSeconds * sampleRateHz).round();
     for (int k = 0; k < beats.length; k++) {
       int b = beats[k];
       if (b < 0 || b >= n) continue;
-      bool early = k > 0 && beats[k] - beats[k - 1] < 0.7 * typicalRr;
-      bool tooHigh = heights.length >= 3 && mv[b].abs() > 2 * typicalR;
+      // (2026-11-25) only an IMPOSSIBLE beat: less than 0.3 s from its neighbour (200 bpm) or over
+      // 3x the usual R wave. Before: earlier than 70 % of the usual interval or over 2x the R wave,
+      // and that is exactly how a ventricular premature beat looks (early and tall): on MIT-BIH
+      // 13 % of the time was "disturbed" and the app found only 21 % of the premature beats
+      int minRr = (impossibleRrSeconds * sampleRateHz).round();
+      bool early = (k > 0 && beats[k] - beats[k - 1] < minRr) ||
+          (k + 1 < beats.length && beats[k + 1] - beats[k] < minRr);
+      bool tooHigh = heights.length >= 3 && mv[b].abs() > impossibleHeightOfR * typicalR;
       if (early || tooHigh) continue;
       for (int i = max(0, b - before); i < min(n, b + after); i++) {
         qrs[i] = true;
@@ -84,10 +93,13 @@ class ArtifactDetector {
       List<double> slopes = [];
       for (int i = start; i < start + window; i++) {
         if (!qrs[i]) swing = max(swing, mv[i].abs());
-        if (i > 0) slopes.add((mv[i] - mv[i - 1]).abs());
+        // the wiggling also only between the beats, and relative to the R wave (2026-11-25): a QRS or
+        // a T wave in the window, or simply a bigger EKG (MIT-BIH: R 1-3 mV, own: 0.3-0.9 mV), made
+        // the median step bigger than 0.03 mV in clean windows
+        if (i > 0 && !qrs[i]) slopes.add((mv[i] - mv[i - 1]).abs());
       }
       slopes.sort();
-      bool wiggling = slopes[slopes.length ~/ 2] > maxTypicalSlope;
+      bool wiggling = slopes.length >= window ~/ 4 && slopes[slopes.length ~/ 2] > wiggleLimit;
       if (swing > swingLimit || wiggling) bad.add(Artifact(start, start + window));
     }
 

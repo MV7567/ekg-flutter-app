@@ -540,7 +540,40 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get instrElectrodesIntro =>
-      'Trzy elektrody, kolory takie jak na kablu z zestawu:';
+      'Trzy elektrody, kolory takie jak na kablu z zestawu. Dwie mierzą sygnał (− i +), trzecia tylko tłumi zakłócenia.';
+
+  @override
+  String get instrVariant1 => 'Wariant 1 (zalecany): tułów';
+
+  @override
+  String get instrMinus => 'Minus (−)';
+
+  @override
+  String get instrMinusWhere => 'pod prawym obojczykiem';
+
+  @override
+  String get instrPlus => 'Plus (+)';
+
+  @override
+  String get instrPlusWhere => 'pod lewym obojczykiem';
+
+  @override
+  String get instrReference => 'Odniesienie';
+
+  @override
+  String get instrReferenceWhere => 'lewa strona brzucha pod sercem';
+
+  @override
+  String get instrVariant2 =>
+      'Wariant 2, tułów: jak wariant 1, ale żółta i zielona elektroda zamienione miejscami. Jakość podobna.';
+
+  @override
+  String get instrVariant3 =>
+      'Wariant 3, nadgarstki: czerwona na prawym nadgarstku, żółta na lewym, zielona na kostce. Ręce muszą leżeć nieruchomo.';
+
+  @override
+  String get instrRule =>
+      'Zasada: czerwona zawsze u góry po prawej, żółta zawsze po lewej, zielona w pozostałym miejscu.';
 
   @override
   String get instrCableRightArm => 'zielony przewód, napis R';
@@ -550,26 +583,6 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get instrCableLeftLeg => 'żółty przewód, napis L';
-
-  @override
-  String get instrRightArm => 'Prawa ręka';
-
-  @override
-  String get instrRightArmWhere =>
-      'prawy nadgarstek albo pod prawym obojczykiem';
-
-  @override
-  String get instrLeftArm => 'Lewa ręka';
-
-  @override
-  String get instrLeftArmWhere => 'lewy nadgarstek albo pod lewym obojczykiem';
-
-  @override
-  String get instrLeftLeg => 'Lewa noga';
-
-  @override
-  String get instrLeftLegWhere =>
-      'lewa strona brzucha pod sercem albo lewa kostka';
 
   @override
   String get instrFrontView =>
@@ -607,7 +620,7 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get instrDuring4 =>
-      'Załamki skierowane w DÓŁ zwykle oznaczają zamienione RA i LA.';
+      'Załamki skierowane w DÓŁ: zamień miejscami czerwoną i żółtą elektrodę.';
 
   @override
   String get instrLengthTitle => '4. Jak długo nagrywać';
@@ -657,7 +670,7 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get rhythmHint =>
-      'Automatyczna ocena z jednego odprowadzenia: wykrywa ok. 2 z 3 pobudzeń przedwczesnych, szerokość QRS i QT mogą się różnić od szpitalnego EKG 12-odprowadzeniowego, a wolne tętno w spoczynku bywa normalne u osób wytrenowanych. Nietypowy wynik skonsultuj z lekarzem.';
+      'Automatyczna ocena z jednego odprowadzenia: wykrywa ok. połowy pobudzeń przedwczesnych, szerokość QRS i QT mogą się różnić od szpitalnego EKG 12-odprowadzeniowego, a wolne tętno w spoczynku bywa normalne u osób wytrenowanych. Nietypowy wynik skonsultuj z lekarzem.';
 
   @override
   String get viewPremature => 'Pobudzenia przedwczesne:';
@@ -676,6 +689,14 @@ class AppLocalizationsPl extends AppLocalizations {
   String qrsTypicalWide(int ms) {
     return 'Typowa szerokość QRS: $ms ms, poszerzony QRS (120 ms lub więcej)';
   }
+
+  @override
+  String get qrsVariableShape =>
+      'Szerokość QRS: nie zmierzono, uderzenia mają zmienny kształt (np. przez głęboki oddech lub ruch, może pomóc inne ułożenie elektrod)';
+
+  @override
+  String get qtVariableShape =>
+      'QT: nie zmierzono, uderzenia mają zmienny kształt';
 
   @override
   String get qrsNotMeasured =>

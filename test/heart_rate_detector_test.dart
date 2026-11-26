@@ -169,4 +169,28 @@ void main() {
     var (loose, _) = run((t) => 42 + 0.17 * sin(2 * pi * 49.9 * t) + 0.15 * (random.nextDouble() - 0.5), 15);
     expect(loose.rhythmSteady, isFalse);
   });
+
+  test('the R mark stays on the R wave when the beats sit on a big breathing wave (after exercise)', () {
+    // a small test EKG (R ~0.25 mV, like the old electrode placement), and the same on a slow
+    // wave: 0.2 Hz (12 breaths a minute), 12 mV peak to peak; the display filter leaves ~1-2 mV
+    // of it, much more than the R wave
+    List<int> beatsOf(double Function(double t) signal) {
+      EkgDisplayFilter filter = EkgDisplayFilter(fs.toDouble());
+      HeartRateDetector detector = HeartRateDetector(fs);
+      List<int> found = [];
+      for (int i = 0; i < 60 * fs; i++) {
+        if (detector.addSample(i, filter.process(signal(i / fs)))) found.add(detector.lastBeat!);
+      }
+      return found;
+    }
+    List<int> clean = beatsOf((t) => 0.2 * EkgTestSignal.millivoltsAt(t));
+    List<int> wavy = beatsOf((t) => 0.2 * EkgTestSignal.millivoltsAt(t) + 6 * sin(2 * pi * 0.2 * t));
+    expect(wavy.length, closeTo(clean.length, 2));
+    // every mark within 40 ms of a mark on the clean signal
+    // (with the height measured from 0: 23 of 69 marks further, up to 156 ms off)
+    for (int b in wavy) {
+      int nearest = clean.reduce((p, q) => (p - b).abs() < (q - b).abs() ? p : q);
+      expect((nearest - b).abs(), lessThanOrEqualTo(10), reason: 'beat at ${b / fs} s');
+    }
+  });
 }

@@ -1,3 +1,4 @@
+import 'dart:math';           // max
 import 'beat_shape.dart';   // the correlation with the median beat
 import 'qrs_width.dart';    // the median beat, the QRS width
 import 'qt_interval.dart';  // the QT interval
@@ -58,6 +59,24 @@ class RhythmAnalysis {
   static const double missedBeatCorrelation = 0.90;
   static const double missedBeatHeight = 0.30;
 
+  // no beat is judged as premature this close to an artifact either: at its edges the movement
+  // already disturbs the signal a little, a "beat" found there is often the disturbance itself
+  // (30 min recording 2026-11-25: 3 of 4 false ventricular beats right next to an artifact)
+  static const double artifactMarginSeconds = 1.0;
+
+  // true = the sample is inside an artifact or within `margin` seconds of one
+  // (checked every 100 ms: an artifact is at least 0.75 s long, see ArtifactDetector)
+  static bool Function(int sample) nearDisturbed(bool Function(int sample) disturbed, int sampleRateHz,
+      {double margin = artifactMarginSeconds}) {
+    int reach = (margin * sampleRateHz).round(), step = max(1, (0.1 * sampleRateHz).round());
+    return (int sample) {
+      for (int d = -reach; d <= reach; d += step) {
+        if (disturbed(sample + d)) return true;
+      }
+      return disturbed(sample + reach);
+    };
+  }
+
   // the same result without the beats for which `leaveOut` is true
   // (inside an atrial fibrillation episode "premature" has no meaning, every beat is irregular)
   // the pauses and the QRS stay
@@ -85,8 +104,12 @@ class RhythmAnalysis {
   // gaps: the lost BLE packets (first missing sample, next saved sample), a pause over a gap is not real
   static RhythmAnalysis analyze(List<int> beats, int sampleRateHz, int averageBpm,
       {bool Function(int sample) disturbed = _never, List<double>? signal, List<(int, int)> gaps = const [],
-      List<double>? measureSignal}) {
-    List<int> timing = findPremature(beats, sampleRateHz, disturbed: disturbed);
+      List<double>? measureSignal, double artifactMargin = artifactMarginSeconds}) {
+    // the premature beats: none in or next to an artifact; the pauses and the QRS: only inside
+    bool Function(int sample) near = artifactMargin <= 0
+        ? disturbed
+        : nearDisturbed(disturbed, sampleRateHz, margin: artifactMargin);
+    List<int> timing = findPremature(beats, sampleRateHz, disturbed: near);
     if (signal == null) {
       return RhythmAnalysis._(classify(averageBpm), timing,
           pauses: findPauses(beats, sampleRateHz, disturbed: disturbed, gaps: gaps));
@@ -100,7 +123,7 @@ class RhythmAnalysis {
     Set<int> ventricular = {};
     for (int k = 1; k < beats.length; k++) {
       int b = beats[k];
-      if (disturbed(b)) continue;
+      if (near(b)) continue;
       double? correlation = template == null
           ? null
           : BeatShape.correlation(signal, b, template, qrs.r, sampleRateHz);

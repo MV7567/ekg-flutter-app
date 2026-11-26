@@ -77,6 +77,7 @@ class HeartRateDetector {
   static const double _timeoutSeconds = 3; // no beat for 3 s -> bpm unknown
   // no beat for 1.5 s (or 1.5 x the usual interval at a slow heart): the threshold is halved
   static const double _searchBackSeconds = 1.5;
+  static const double _qrsSlopeShare = 0.3;   // see _findR
 
   // one filtered sample, sampleIndex counts the lost packets too (the real time)
   // returns true when this sample finished a beat
@@ -196,13 +197,46 @@ class HeartRateDetector {
     if (endIndex - from >= _history.length) from = endIndex - _history.length + 1;   // only what is kept
     _humpRAmplitude = 0;
     _humpRIndex = endIndex;
+    // WHERE the R wave is: the furthest point from a straight line between the first and the last
+    // sample of this part, not from 0: after exercise the beats sit on a breathing wave of 1-2 mV,
+    // the top of that wave was further from 0 than the R wave and the beat was marked ~200 ms off
+    // (2026-11-25); HOW HIGH it is (the "too small for a QRS" check) stays the biggest |EKG|:
+    // the height from the line refused real beats on MIT-BIH 108 (big P and T waves)
+    // the line starts 100 ms before the searched part: the hump can start late (QTDB sel42, a tall R
+    // with a long sloping ST), then the searched part starts at the top of R and a line from there
+    // runs through the R wave itself
+    int lineFrom = max(endIndex - _history.length + 1, from - _lookBackSamples);
+    double first = _history[lineFrom % _history.length], lastValue = _history[endIndex % _history.length];
+    int span = max(1, endIndex - lineFrom);
+    double fromLine(int k) =>
+        (_history[k % _history.length] - (first + (lastValue - first) * (k - lineFrom) / span)).abs();
+    int furthestFromZero = endIndex, furthestFromLine = endIndex;
     for (int k = from; k <= endIndex; k++) {
-      double v = _history[k % _history.length].abs();
-      if (v > _humpRAmplitude) {
-        _humpRAmplitude = v;
-        _humpRIndex = k;
+      double value = _history[k % _history.length].abs();
+      if (value > _humpRAmplitude) {
+        _humpRAmplitude = value;
+        furthestFromZero = k;
       }
+      if (fromLine(k) > fromLine(furthestFromLine)) furthestFromLine = k;
     }
+    // the point from the line only when the old one is on a slow wave, not in a QRS: no steep
+    // slope (>= 30 % of the steepest of this part) within 40 ms of it. In a wide QRS (a ventricular
+    // beat) R and S are both real; always taking the point from the line moved 22 % instead of
+    // 10 % of the ventricular beats by more than 40 ms on MIT-BIH
+    double steepness(int center, int reach) {
+      double s = 0;
+      for (int k = max(from + 2, center - reach); k <= min(endIndex, center + reach); k++) {
+        s = max(s, (_history[k % _history.length] - _history[(k - 2) % _history.length]).abs());
+      }
+      return s;
+    }
+    double steepest = steepness(from + 2, endIndex - from);
+    bool onSlowWave = steepness(furthestFromZero, (0.04 * sampleRateHz).round()) < _qrsSlopeShare * steepest;
+    // ... and the new point clearly further from the line than the old one (the old one was only
+    // the top of the slow wave): a tall R with a long sloping ST segment (QTDB sel42) has no steep
+    // slope right at its top either, but it is far from the line
+    bool clearlyBigger = fromLine(furthestFromLine) > 1.5 * fromLine(furthestFromZero);
+    _humpRIndex = onSlowWave && clearlyBigger ? furthestFromLine : furthestFromZero;
   }
 
   // a hump that was no beat teaches the noise level (1/8 new, 7/8 old)

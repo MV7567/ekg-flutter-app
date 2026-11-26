@@ -45,9 +45,14 @@ class InstructionsScreen extends StatelessWidget {
             _section(context, t.instrElectrodesTitle),
             Text(t.instrElectrodesIntro),
             const SizedBox(height: 8),
-            _ElectrodeRow('RA', t.instrRightArm, t.instrRightArmWhere, rightArmColor, t.instrCableRightArm),
-            _ElectrodeRow('LA', t.instrLeftArm, t.instrLeftArmWhere, leftArmColor, t.instrCableLeftArm),
-            _ElectrodeRow('LL', t.instrLeftLeg, t.instrLeftLegWhere, leftLegColor, t.instrCableLeftLeg),
+            // the roles measured on 2026-11-25: red = the "-" input, yellow = the "+" input,
+            // green = the reference (right leg drive), whatever the letters on the cable say
+            // 3 tested sets (notatki/ulozenie_elektrod_2026-11-25.md): option 1 = lead I on the body
+            // (the least noise, a clear T wave), option 2 = lead II, option 3 = lead I on the wrists
+            Text(t.instrVariant1, style: const TextStyle(fontWeight: FontWeight.bold)),
+            _ElectrodeRow('−', t.instrMinus, t.instrMinusWhere, leftArmColor, t.instrCableLeftArm),
+            _ElectrodeRow('+', t.instrPlus, t.instrPlusWhere, leftLegColor, t.instrCableLeftLeg),
+            _ElectrodeRow('REF', t.instrReference, t.instrReferenceWhere, rightArmColor, t.instrCableRightArm),
             const SizedBox(height: 12),
             Center(
               child: CustomPaint(
@@ -63,6 +68,11 @@ class InstructionsScreen extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
             ),
+            const SizedBox(height: 12),
+            _Bullet(t.instrVariant2),
+            _Bullet(t.instrVariant3),
+            const SizedBox(height: 8),
+            Text(t.instrRule, style: const TextStyle(fontWeight: FontWeight.bold)),
 
             _section(context, t.instrSkinTitle),
             _Bullet(t.instrSkin1),
@@ -192,9 +202,11 @@ class _ElectrodeMapPainter extends CustomPainter {
     // every dot in the color of its lead on the cable
     // the labels inside the body, so they never cross the lines of the arms or the torso:
     // RA / LA under their dot, LL (near the bottom edge) to the left of it
-    _electrode(canvas, Offset(cx - w * 0.15, h * 0.29), 'RA', InstructionsScreen.rightArmColor, labelBelow: true);
-    _electrode(canvas, Offset(cx + w * 0.15, h * 0.29), 'LA', InstructionsScreen.leftArmColor, labelBelow: true);
-    _electrode(canvas, Offset(cx + w * 0.13, h * 0.58), 'LL', InstructionsScreen.leftLegColor, labelBelow: false);
+    // option 1, lead I on the body: "-" below the right collarbone, "+" below the left one,
+    // the reference on the left side of the belly below the heart
+    _electrode(canvas, Offset(cx - w * 0.15, h * 0.29), '−', InstructionsScreen.leftArmColor, labelBelow: true);
+    _electrode(canvas, Offset(cx + w * 0.15, h * 0.29), '+', InstructionsScreen.leftLegColor, labelBelow: true);
+    _electrode(canvas, Offset(cx + w * 0.13, h * 0.58), 'REF', InstructionsScreen.rightArmColor, labelBelow: false);
   }
 
   void _electrode(Canvas canvas, Offset at, String label, Color color, {required bool labelBelow}) {

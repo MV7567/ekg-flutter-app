@@ -31,9 +31,17 @@ void main() {
   testWidgets('instructions show the 3 electrodes', (tester) async {
     // a very tall screen: ListView builds only what is visible, here everything is
     await pumpInstructions(tester, const Size(1080, 8000));
-    expect(find.text('RA'), findsOneWidget);
-    expect(find.text('LA'), findsOneWidget);
-    expect(find.text('LL'), findsOneWidget);
+    // the roles, not the letters on the cable: red "-", yellow "+", green the reference
+    expect(find.text('−'), findsOneWidget);
+    expect(find.text('+'), findsOneWidget);
+    expect(find.text('REF'), findsOneWidget);
+    expect(find.text('Minus (−): pod prawym obojczykiem'), findsOneWidget);
+    expect(find.text('Plus (+): pod lewym obojczykiem'), findsOneWidget);
+    // the other two tested sets and the rule that keeps them apart
+    expect(find.textContaining('Wariant 2'), findsOneWidget);
+    expect(find.textContaining('Wariant 3, nadgarstki'), findsOneWidget);
+    expect(find.textContaining('czerwona zawsze u góry po prawej'), findsOneWidget);
+    expect(find.textContaining('zamień miejscami czerwoną i żółtą'), findsOneWidget);
     // the leads of the kit's cable, under every electrode (the screen is in Polish)
     expect(find.text('zielony przewód, napis R'), findsOneWidget);
     expect(find.text('czerwony przewód, bez napisu'), findsOneWidget);

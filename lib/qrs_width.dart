@@ -1,4 +1,5 @@
 import 'dart:math';   // max
+import 'beat_shape.dart';   // the correlation of one beat with the median beat
 
 // the width (duration) of the QRS complex, from the filtered EKG and the found R waves
 //
@@ -22,6 +23,24 @@ class QrsWidth {
   static const double maxBeforeRMs = 120;    // the QRS start is searched at most this far before R
   static const double maxAfterRMs = 160;     // and the end at most this far after R
   static const double wideMs = 120;          // the usual limit of a wide QRS
+  // the beats of the median beat must look alike, or their median is no real beat: in a lead
+  // almost at right angles to the heart (lead III) breathing changes the QRS shape, after exercise
+  // the R marks move on the wander; the median of such beats gave a QRS of 120 ms and a QT of
+  // 608 ms (2026-11-25). The median correlation of the beats with their median beat: own
+  // recordings at rest 0.988-0.995, with changing shapes 0.88-0.96 -> limit 0.97
+  static const double minShapeAgreement = 0.97;
+
+  // the median correlation (BeatShape) of the beats with the median beat, null = none comparable
+  static double? shapeAgreement(List<double> x, List<int> beats, List<double> median, int medianR,
+      int sampleRateHz) {
+    List<double> c = [
+      for (int b in beats) BeatShape.correlation(x, b, median, medianR, sampleRateHz),
+    ].whereType<double>().toList()..sort();
+    return c.isEmpty ? null : c[c.length ~/ 2];
+  }
+
+  static bool similarShapes(List<double> x, List<int> beats, List<double> median, int medianR, int sampleRateHz) =>
+      (shapeAgreement(x, beats, median, medianR, sampleRateHz) ?? 0) >= minShapeAgreement;
 
   // (start, end) sample numbers of the QRS around the R wave at r, null = the signal is too
   // short there or no flat part was found (noise, a moving electrode)
@@ -128,12 +147,13 @@ class QrsWidth {
 
 // everything about the QRS of one recording, for the statistics card and the PDF report
 class QrsSummary {
-  QrsSummary._(this.medianBeat, this.r, this.qrs, this.beatCount);
+  QrsSummary._(this.medianBeat, this.r, this.qrs, this.beatCount, {this.variableShape = false});
 
   final List<double>? medianBeat;   // the median beat (mV), null = fewer than 5 regular beats
   final int r;                      // the position of R in medianBeat
   final (int, int)? qrs;            // start and end of the QRS in medianBeat, null = not measured
   final int beatCount;              // how many beats are in the median beat
+  final bool variableShape;         // the beats differ too much (QrsWidth.minShapeAgreement), qrs = null
 
   double? typicalMs(int sampleRateHz) => qrs == null ? null : (qrs!.$2 - qrs!.$1) * 1000 / sampleRateHz;
 
@@ -143,7 +163,9 @@ class QrsSummary {
       {List<int> premature = const [], bool Function(int sample) disturbed = QrsWidth._never}) {
     List<int> regular = QrsWidth.regularBeats(beats, skip: premature.toSet(), disturbed: disturbed);
     (List<double>, int)? median = QrsWidth.medianBeat(x, regular, sampleRateHz);
-    (int, int)? qrs = median == null ? null : QrsWidth.measure(median.$1, median.$2, sampleRateHz);
-    return QrsSummary._(median?.$1, median?.$2 ?? 0, qrs, median == null ? 0 : regular.length);
+    bool variable = median != null && !QrsWidth.similarShapes(x, regular, median.$1, median.$2, sampleRateHz);
+    (int, int)? qrs = median == null || variable ? null : QrsWidth.measure(median.$1, median.$2, sampleRateHz);
+    return QrsSummary._(median?.$1, median?.$2 ?? 0, qrs, median == null ? 0 : regular.length,
+        variableShape: variable);
   }
 }

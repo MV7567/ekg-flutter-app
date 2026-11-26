@@ -228,4 +228,17 @@ void main() {
     expect(RecordingStatsCard.sentence('Już ze zdaniem.'), 'Już ze zdaniem.');
     expect(RecordingStatsCard.sentence(''), '');
   });
+
+  test('no premature beat next to an artifact (within 1 s), it may be the disturbance itself', () {
+    // a beat every 200 samples (0.8 s), beat 20 comes 60 samples early (with the pause after it)
+    List<int> beats = [for (int k = 0; k < 40; k++) k * 200 - (k == 20 ? 60 : 0)];
+    int early = beats[20];
+    // an artifact 0.5-0.8 s after the early beat, not on it
+    bool disturbed(int s) => s >= early + 125 && s < early + 200;
+    expect(RhythmAnalysis.analyze(beats, 250, 75, disturbed: disturbed, artifactMargin: 0).prematureBeats, [early]);
+    expect(RhythmAnalysis.analyze(beats, 250, 75, disturbed: disturbed).prematureBeats, isEmpty);
+    // far from it: still found
+    bool far(int s) => s >= early + 1000 && s < early + 1100;
+    expect(RhythmAnalysis.analyze(beats, 250, 75, disturbed: far).prematureBeats, [early]);
+  });
 }

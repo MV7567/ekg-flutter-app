@@ -146,12 +146,13 @@ class QtInterval {
 //   the T end: on the long median beat (300 ms before R, up to 600 ms after) of the ZERO PHASE
 //   filtered signal (see ZeroPhaseFilter: the live filters move the T wave)
 class QtSummary {
-  QtSummary._(this.beat, this.r, this.qrs, this.qt);
+  QtSummary._(this.beat, this.r, this.qrs, this.qt, {this.variableShape = false});
 
   final List<double> beat;   // the long median beat (mV), for the chart
   final int r;               // R in it
   final (int, int)? qrs;     // the QRS start / end in it, null = not measured
   final QtMeasurement? qt;   // null = no clear T wave (or no QRS)
+  final bool variableShape;  // the beats differ too much (QrsWidth.minShapeAgreement): no QRS, no QT
 
   // regularBeats: e.g. QrsWidth.regularBeats, rrMs: the typical RR interval
   // null = fewer than 5 usable beats
@@ -161,6 +162,9 @@ class QtSummary {
     (List<double>, int)? long = QrsWidth.medianBeat(measureSignal, regularBeats, sampleRateHz,
         beforeMs: QtInterval.beforeRMs, afterMs: QtInterval.afterRMs(rrMs));
     if (chart == null || long == null) return null;
+    if (!QrsWidth.similarShapes(chartSignal, regularBeats, chart.$1, chart.$2, sampleRateHz)) {
+      return QtSummary._(long.$1, long.$2, null, null, variableShape: true);
+    }
     (int, int)? q = QrsWidth.measure(chart.$1, chart.$2, sampleRateHz);
     (int, int)? qrs = q == null ? null : (long.$2 + q.$1 - chart.$2, long.$2 + q.$2 - chart.$2);
     QtMeasurement? qt = qrs == null

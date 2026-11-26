@@ -104,4 +104,25 @@ void main() {
     expect(none.medianBeat, isNull);
     expect(none.typicalMs(fs), isNull);
   });
+
+  test('beats of changing shape (like lead III with deep breathing): no QRS width, no QT', () {
+    // 12 beats every 200 samples; every other one with a much smaller R and a deeper S
+    // (the shape turns over with the breathing): the median of such beats is no real beat
+    List<double> same = [], changing = [];
+    List<int> beats = [];
+    for (int k = 0; k < 12; k++) {
+      var (one, r) = oneQrs(90, length: 200, start: 50);
+      beats.add(same.length + r);
+      same.addAll(one);
+      changing.addAll(k.isOdd ? [for (double v in one) v < 0 ? 3 * v : 0.2 * v] : one);
+    }
+    QrsSummary ok = QrsSummary.analyze(same, beats, fs);
+    expect(ok.variableShape, isFalse);
+    expect(ok.typicalMs(fs), closeTo(90, 8));
+    QrsSummary bad = QrsSummary.analyze(changing, beats, fs);
+    expect(bad.variableShape, isTrue);
+    expect(bad.typicalMs(fs), isNull);
+    expect(QrsWidth.shapeAgreement(changing, beats.sublist(1, 11), bad.medianBeat!, bad.r, fs)!,
+        lessThan(QrsWidth.minShapeAgreement));
+  });
 }

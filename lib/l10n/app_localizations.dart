@@ -995,8 +995,68 @@ abstract class AppLocalizations {
   /// No description provided for @instrElectrodesIntro.
   ///
   /// In en, this message translates to:
-  /// **'Three electrodes, the colors are the ones of the cable in this kit:'**
+  /// **'Three electrodes, the colors are the ones of the cable in this kit. Two of them measure the signal (− and +), the third one only reduces the interference.'**
   String get instrElectrodesIntro;
+
+  /// No description provided for @instrVariant1.
+  ///
+  /// In en, this message translates to:
+  /// **'Option 1 (recommended): on the body'**
+  String get instrVariant1;
+
+  /// No description provided for @instrMinus.
+  ///
+  /// In en, this message translates to:
+  /// **'Minus (−)'**
+  String get instrMinus;
+
+  /// No description provided for @instrMinusWhere.
+  ///
+  /// In en, this message translates to:
+  /// **'below the right collarbone'**
+  String get instrMinusWhere;
+
+  /// No description provided for @instrPlus.
+  ///
+  /// In en, this message translates to:
+  /// **'Plus (+)'**
+  String get instrPlus;
+
+  /// No description provided for @instrPlusWhere.
+  ///
+  /// In en, this message translates to:
+  /// **'below the left collarbone'**
+  String get instrPlusWhere;
+
+  /// No description provided for @instrReference.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference'**
+  String get instrReference;
+
+  /// No description provided for @instrReferenceWhere.
+  ///
+  /// In en, this message translates to:
+  /// **'left side of the belly, below the heart'**
+  String get instrReferenceWhere;
+
+  /// No description provided for @instrVariant2.
+  ///
+  /// In en, this message translates to:
+  /// **'Option 2, on the body: like option 1, but the yellow and the green electrode swapped. Similar quality.'**
+  String get instrVariant2;
+
+  /// No description provided for @instrVariant3.
+  ///
+  /// In en, this message translates to:
+  /// **'Option 3, wrists: red on the right wrist, yellow on the left one, green on an ankle. The arms must rest still.'**
+  String get instrVariant3;
+
+  /// No description provided for @instrRule.
+  ///
+  /// In en, this message translates to:
+  /// **'Rule: red always at the top on the right, yellow always on the left, green in the remaining place.'**
+  String get instrRule;
 
   /// No description provided for @instrCableRightArm.
   ///
@@ -1015,42 +1075,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'yellow lead, marked L'**
   String get instrCableLeftLeg;
-
-  /// No description provided for @instrRightArm.
-  ///
-  /// In en, this message translates to:
-  /// **'Right arm'**
-  String get instrRightArm;
-
-  /// No description provided for @instrRightArmWhere.
-  ///
-  /// In en, this message translates to:
-  /// **'right wrist or below the right collarbone'**
-  String get instrRightArmWhere;
-
-  /// No description provided for @instrLeftArm.
-  ///
-  /// In en, this message translates to:
-  /// **'Left arm'**
-  String get instrLeftArm;
-
-  /// No description provided for @instrLeftArmWhere.
-  ///
-  /// In en, this message translates to:
-  /// **'left wrist or below the left collarbone'**
-  String get instrLeftArmWhere;
-
-  /// No description provided for @instrLeftLeg.
-  ///
-  /// In en, this message translates to:
-  /// **'Left leg'**
-  String get instrLeftLeg;
-
-  /// No description provided for @instrLeftLegWhere.
-  ///
-  /// In en, this message translates to:
-  /// **'left side of the belly, below the heart, or the left ankle'**
-  String get instrLeftLegWhere;
 
   /// No description provided for @instrFrontView.
   ///
@@ -1109,7 +1133,7 @@ abstract class AppLocalizations {
   /// No description provided for @instrDuring4.
   ///
   /// In en, this message translates to:
-  /// **'Spikes pointing DOWN usually mean RA and LA are swapped.'**
+  /// **'Spikes pointing DOWN: swap the red and the yellow electrode.'**
   String get instrDuring4;
 
   /// No description provided for @instrLengthTitle.
@@ -1175,7 +1199,7 @@ abstract class AppLocalizations {
   /// No description provided for @rhythmHint.
   ///
   /// In en, this message translates to:
-  /// **'An automatic check from one lead: it finds about 2 of 3 premature beats, the QRS width and the QT can differ from a hospital 12-lead ECG, and a slow heart rate at rest can be normal in fit people. Show an unusual result to a doctor.'**
+  /// **'An automatic check from one lead: it finds about half of the premature beats, the QRS width and the QT can differ from a hospital 12-lead ECG, and a slow heart rate at rest can be normal in fit people. Show an unusual result to a doctor.'**
   String get rhythmHint;
 
   /// No description provided for @viewPremature.
@@ -1201,6 +1225,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Typical QRS width: {ms} ms, a wide QRS (120 ms or more)'**
   String qrsTypicalWide(int ms);
+
+  /// No description provided for @qrsVariableShape.
+  ///
+  /// In en, this message translates to:
+  /// **'QRS width: not measured, the beats change their shape (e.g. deep breathing or moving, another electrode placement may help)'**
+  String get qrsVariableShape;
+
+  /// No description provided for @qtVariableShape.
+  ///
+  /// In en, this message translates to:
+  /// **'QT: not measured, the beats change their shape'**
+  String get qtVariableShape;
 
   /// No description provided for @qrsNotMeasured.
   ///

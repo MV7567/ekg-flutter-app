@@ -44,6 +44,25 @@ void main() {
     expect(covers(found, 30.3, 31.7), isTrue);
   });
 
+  test('a premature beat (early and tall) is no disturbance, an impossible extra "beat" is', () {
+    // the R waves of the clean test EKG, an extra narrow beat 60 % of the interval after one of them
+    Float32List clean = ekg(60);
+    List<int> r = HeartRateDetector.findBeats(clean, fs);
+    double rr = (r[31] - r[30]) / fs;
+    double early = r[30] / fs + 0.6 * rr;   // like a ventricular premature beat: early ...
+    double spike(double t, double at, double mv) => mv * exp(-pow((t - at) / 0.012, 2).toDouble());
+    // ... and 1.8 x taller than the usual R wave (2026-11-25: such beats were "disturbances")
+    Float32List premature = ekg(60, extra: (t) => spike(t, early, 1.8));
+    List<int> beats = HeartRateDetector.findBeats(premature, fs);
+    expect(beats.any((b) => (b / fs - early).abs() < 0.05), isTrue);   // the detector finds it
+    expect(ArtifactDetector.find(premature, beats, fs), isEmpty);
+    // the same 0.2 s after an R wave: no heart beats that fast (300 bpm), so it is the disturbance
+    double tooSoon = r[30] / fs + 0.2;
+    Float32List impossible = ekg(60, extra: (t) => spike(t, tooSoon, 1.8));
+    List<Artifact> found = ArtifactDetector.find(impossible, HeartRateDetector.findBeats(impossible, fs), fs);
+    expect(found.any((a) => a.contains((tooSoon * fs).round())), isTrue);
+  });
+
   test('the first 3 s are not checked (settling, the detector is learning)', () {
     Float32List mv = ekg(30, extra: (t) => t < 2 ? 2 * sin(2 * pi * 2 * t) : 0);
     expect(ArtifactDetector.find(mv, HeartRateDetector.findBeats(mv, fs), fs), isEmpty);

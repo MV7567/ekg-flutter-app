@@ -25,6 +25,7 @@ class RecordingStatsCard extends StatelessWidget {
   // otherwise the values and whether the QTc (Bazett) is normal, long or short
   static List<String> qtLines(AppLocalizations t, QtSummary? summary) {
     if (summary == null) return [];
+    if (summary.variableShape) return [t.qtVariableShape];
     QtMeasurement? qt = summary.qt;
     if (qt == null) return [t.qtNotMeasured];
     return [
@@ -40,6 +41,8 @@ class RecordingStatsCard extends StatelessWidget {
   // the median beat to show: the long one with the T wave (and the QT) if there is one,
   // otherwise the short one of the QRS; (beat, QRS, T end), null = none
   static (List<double>, (int, int)?, int?)? beatToShow(RhythmAnalysis rhythm) {
+    // beats of different shapes: their median is no real beat, better none than a misleading one
+    if (rhythm.qrs?.variableShape ?? false) return null;
     QtSummary? qt = rhythm.qt;
     if (qt != null) return (qt.beat, qt.qrs, qt.qt?.tEnd);
     List<double>? short = rhythm.qrs?.medianBeat;
@@ -73,7 +76,9 @@ class RecordingStatsCard extends StatelessWidget {
         if (rhythm.runs.isNotEmpty) t.rhythmRuns(rhythm.pairs, rhythm.longRuns),
         rhythm.pauses.isEmpty ? t.rhythmNoPauses : t.rhythmPauses(rhythm.pauses.length, longestPause),
         if (qrs != null)
-          if (ms == null)
+          if (qrs.variableShape)
+            t.qrsVariableShape
+          else if (ms == null)
             t.qrsNotMeasured
           else if (ms >= QrsWidth.wideMs)
             t.qrsTypicalWide(ms.round())
